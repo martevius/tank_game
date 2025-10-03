@@ -150,7 +150,7 @@ class Tank(pygame.sprite.Sprite):
         """Handles acceleration, turning, collision detection, and world boundary checks."""
         if not self.is_alive: return
         
-        if is_player and drive_system == DRIVE_SYSTEM_INDEPENDENT:
+        elif is_player and drive_system == DRIVE_SYSTEM_INDEPENDENT:
             # --- INDEPENDENT TRACK DRIVE LOGIC ---
             
             # Use provided control_keys, or fall back to defaults if not provided (shouldn't happen for player)
@@ -163,9 +163,72 @@ class Tank(pygame.sprite.Sprite):
             left_reverse = keys[controls['lr']]
             right_forward = keys[controls['rf']]
             right_reverse = keys[controls['rr']]
+            
+            # NEW LOGIC: Max reverse speed is half of max forward speed (TANK_MAX_SPEED / 2)
+            MAX_REVERSE_SPEED = TANK_MAX_SPEED / 2.0 
+            
+            # Calculate left track speed
+            # If going forward, use TANK_MAX_SPEED; if going reverse, use MAX_REVERSE_SPEED
+            if left_forward and not left_reverse:
+                left_speed = TANK_MAX_SPEED 
+            elif left_reverse and not left_forward:
+                left_speed = -MAX_REVERSE_SPEED # Note the negative sign for reverse
+            else:
+                left_speed = 0.0 # Brakes/Idle
 
-            left_speed = (left_forward - left_reverse) * TANK_MAX_SPEED
-            right_speed = (right_forward - right_reverse) * TANK_MAX_SPEED
+            # Calculate right track speed
+            # If going forward, use TANK_MAX_SPEED; if going reverse, use MAX_REVERSE_SPEED
+            if right_forward and not right_reverse:
+                right_speed = TANK_MAX_SPEED
+            elif right_reverse and not right_forward:
+                right_speed = -MAX_REVERSE_SPEED
+            else:
+                right_speed = 0.0 # Brakes/Idle
+
+            # The original implementation used continuous control (0 or 1), 
+            # while this new logic uses an instantaneous max speed. 
+            # For a more nuanced approach closer to the original, you'd integrate TANK_ACCEL.
+            # *Assuming the intent is to enforce the MAX limit on the resulting speed:*
+            # 
+            # --- Alternate Implementation (closer to original speed * factor structure) ---
+            # left_speed = 0.0
+            # if left_forward:
+            #     left_speed = TANK_MAX_SPEED
+            # elif left_reverse:
+            #     left_speed = -MAX_REVERSE_SPEED
+            # 
+            # right_speed = 0.0
+            # if right_forward:
+            #     right_speed = TANK_MAX_SPEED
+            # elif right_reverse:
+            #     right_speed = -MAX_REVERSE_SPEED
+            # ----------------------------------------------------------------------------
+            
+            # I will use a version that multiplies the difference by the max forward speed 
+            # and then clamps the reverse component to half the max speed. This is 
+            # simpler and aligns with the original code's one-liner style.
+            
+            # Reverting to the original structure but clamping reverse
+            # Note: This approach doesn't use TANK_ACCEL for acceleration/deceleration.
+            
+            # Max forward speed
+            fwd_factor = TANK_MAX_SPEED
+            # Max reverse speed (absolute value)
+            rev_factor = TANK_MAX_SPEED / 2.0 
+            
+            left_throttle = left_forward - left_reverse
+            right_throttle = right_forward - right_reverse
+            
+            # Clamp the speed based on throttle direction and max limits
+            left_speed = (
+                max(0, left_throttle) * fwd_factor + # Forward component (max 1 * fwd)
+                min(0, left_throttle) * rev_factor  # Reverse component (min -1 * rev)
+            )
+            right_speed = (
+                max(0, right_throttle) * fwd_factor + 
+                min(0, right_throttle) * rev_factor
+            )
+            
             
             # Average forward speed
             avg_speed = (left_speed + right_speed) / 2.0
