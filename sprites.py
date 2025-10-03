@@ -146,44 +146,111 @@ class Tank(pygame.sprite.Sprite):
         # Reset cooldown
         self.fire_cooldown = FIRE_COOLDOWN_FRAMES
 
-    def update_movement(self, keys, is_player, features):
+    def update_movement(self, keys, is_player, features, drive_system=DRIVE_SYSTEM_STANDARD, control_keys=None):
         """Handles acceleration, turning, collision detection, and world boundary checks."""
         if not self.is_alive: return
         
-        # Determine movement input
-        if is_player:
-            is_forward_throttle = keys[pygame.K_w]
-            is_reverse_throttle = keys[pygame.K_r]
-            is_turning_left = keys[pygame.K_a]
-            is_turning_right = keys[pygame.K_s]
-        else:
+        if is_player and drive_system == DRIVE_SYSTEM_INDEPENDENT:
+            # --- INDEPENDENT TRACK DRIVE LOGIC ---
+            
+            # Use provided control_keys, or fall back to defaults if not provided (shouldn't happen for player)
+            controls = control_keys if control_keys else {
+                'lf': KEY_LEFT_FORWARD, 'lr': KEY_LEFT_REVERSE,
+                'rf': KEY_RIGHT_FORWARD, 'rr': KEY_RIGHT_REVERSE
+            }
+
+            left_forward = keys[controls['lf']]
+            left_reverse = keys[controls['lr']]
+            right_forward = keys[controls['rf']]
+            right_reverse = keys[controls['rr']]
+
+            left_speed = (left_forward - left_reverse) * TANK_MAX_SPEED
+            right_speed = (right_forward - right_reverse) * TANK_MAX_SPEED
+            
+            # Average forward speed
+            avg_speed = (left_speed + right_speed) / 2.0
+            
+            # Differential speed for turning
+            turn_speed = (right_speed - left_speed) * 0.5 # Factor to control turn rate
+            
+            # Update angle (turning is instantaneous based on speed differential)
+            self.angle += turn_speed / TANK_MAX_SPEED * BASE_TURN_RATE * 2.5 # Adjust multiplier for desired turn rate
+            self.angle %= 360
+
+            # Set self.speed for collision/velocity logic
+            # This is simplified: in a true physics simulation, speed is not a single value.
+            # Here, we use the average speed to determine the forward motion.
+            self.speed = avg_speed
+            
+            # Note: TANK_ACCEL logic is bypassed in this mode for simplicity
+            
+        elif is_player and drive_system == DRIVE_SYSTEM_STANDARD:
+            # --- STANDARD DRIVE LOGIC (Original) ---
+            
+            # Use provided control_keys, or fall back to defaults
+            controls = control_keys if control_keys else {
+                'f': KEY_FORWARD, 'r': KEY_REVERSE,
+                'l': KEY_TURN_LEFT, 's': KEY_TURN_RIGHT
+            }
+            
+            is_forward_throttle = keys[controls['f']]
+            is_reverse_throttle = keys[controls['r']]
+            is_turning_left = keys[controls['l']]
+            is_turning_right = keys[controls['s']]
+            
+            # Throttle (Acceleration/Deceleration)
+            if is_forward_throttle: 
+                self.speed = min(self.speed + TANK_ACCEL, TANK_MAX_SPEED)
+            elif is_reverse_throttle: 
+                self.speed = max(self.speed - TANK_ACCEL, -TANK_MAX_SPEED / 2)
+            else:
+                if self.speed > 0:
+                    self.speed = max(0.0, self.speed - TANK_ACCEL / 2)
+                elif self.speed < 0:
+                    self.speed = min(0.0, self.speed + TANK_ACCEL / 2)
+
+            # Steering
+            current_abs_speed = abs(self.speed)
+            # Speed factor logic... (Original code)
+            speed_factor = 1.0 + (TANK_MAX_SPEED - current_abs_speed) / TANK_MAX_SPEED if TANK_MAX_SPEED > 0 else 1.0
+            dynamic_turn_rate = BASE_TURN_RATE * speed_factor
+
+            if current_abs_speed > 0.01 and (is_turning_left or is_turning_right): 
+                turn_direction = 1 if self.speed > 0 else -1
+                if is_turning_left: self.angle -= dynamic_turn_rate * turn_direction
+                elif is_turning_right: self.angle += dynamic_turn_rate * turn_direction
+            
+        else: # AI Tank Logic (simplified)
+            # Enemy/Friendly Tank Logic (uses internal keys dict)
             is_forward_throttle = keys.get(pygame.K_w, False) 
             is_reverse_throttle = keys.get(pygame.K_r, False)
             is_turning_left = keys.get(pygame.K_a, False)     
             is_turning_right = keys.get(pygame.K_s, False)
-        
-        # Throttle (Acceleration/Deceleration)
-        if is_forward_throttle: 
-            self.speed = min(self.speed + TANK_ACCEL, TANK_MAX_SPEED)
-        elif is_reverse_throttle: 
-            self.speed = max(self.speed - TANK_ACCEL, -TANK_MAX_SPEED / 2)
-        else:
-            if self.speed > 0:
-                self.speed = max(0.0, self.speed - TANK_ACCEL / 2)
-            elif self.speed < 0:
-                self.speed = min(0.0, self.speed + TANK_ACCEL / 2)
 
-        # Steering
-        current_abs_speed = abs(self.speed)
-        speed_factor = 1.0 + (TANK_MAX_SPEED - current_abs_speed) / TANK_MAX_SPEED if TANK_MAX_SPEED > 0 else 1.0
-        dynamic_turn_rate = BASE_TURN_RATE * speed_factor
+            # Throttle (Acceleration/Deceleration) - AI logic remains the same
+            if is_forward_throttle: 
+                self.speed = min(self.speed + TANK_ACCEL, TANK_MAX_SPEED)
+            elif is_reverse_throttle: 
+                self.speed = max(self.speed - TANK_ACCEL, -TANK_MAX_SPEED / 2)
+            else:
+                if self.speed > 0:
+                    self.speed = max(0.0, self.speed - TANK_ACCEL / 2)
+                elif self.speed < 0:
+                    self.speed = min(0.0, self.speed + TANK_ACCEL / 2)
+                    
+            # Steering - AI logic remains the same
+            current_abs_speed = abs(self.speed)
+            speed_factor = 1.0 + (TANK_MAX_SPEED - current_abs_speed) / TANK_MAX_SPEED if TANK_MAX_SPEED > 0 else 1.0
+            dynamic_turn_rate = BASE_TURN_RATE * speed_factor
 
-        if current_abs_speed > 0.01 and (is_turning_left or is_turning_right): 
-            turn_direction = 1 if self.speed > 0 else -1
-            if is_turning_left: self.angle -= dynamic_turn_rate * turn_direction
-            elif is_turning_right: self.angle += dynamic_turn_rate * turn_direction
-        
-        # Calculate Potential Movement 
+            if current_abs_speed > 0.01 and (is_turning_left or is_turning_right): 
+                turn_direction = 1 if self.speed > 0 else -1
+                if is_turning_left: self.angle -= dynamic_turn_rate * turn_direction
+                elif is_turning_right: self.angle += dynamic_turn_rate * turn_direction
+
+
+        # Calculate Potential Movement (Same for all drive modes)
+        # Note: self.angle is updated by both drive modes
         new_x = self.x + self.speed * math.cos(math.radians(self.angle - 90))
         new_y = self.y + self.speed * math.sin(math.radians(self.angle - 90))
 
@@ -285,11 +352,30 @@ class Tank(pygame.sprite.Sprite):
 class PlayerTank(Tank):
     def __init__(self, x, y, fire_sound, explosion_sound):
         super().__init__(x, y, 'Friendly', fire_sound, explosion_sound) 
+        # Player-specific settings
+        self.drive_system = DEFAULT_DRIVE_SYSTEM
+        self.control_keys = {
+            DRIVE_SYSTEM_STANDARD: {
+                'f': KEY_FORWARD, 'r': KEY_REVERSE,
+                'l': KEY_TURN_LEFT, 's': KEY_TURN_RIGHT
+            },
+            DRIVE_SYSTEM_INDEPENDENT: {
+                'lf': KEY_LEFT_FORWARD, 'lr': KEY_LEFT_REVERSE,
+                'rf': KEY_RIGHT_FORWARD, 'rr': KEY_RIGHT_REVERSE
+            }
+        }
         
     def update(self, keys, mouse_pos, features):
         """Handles player input for movement and decrements cooldown."""
         
-        self.update_movement(keys, is_player=True, features=features)
+        # Pass the current drive system and control keys to the base class
+        self.update_movement(
+            keys, 
+            is_player=True, 
+            features=features, 
+            drive_system=self.drive_system,
+            control_keys=self.control_keys[self.drive_system]
+        )
         
         if self.fire_cooldown > 0:
             self.fire_cooldown -= 1
@@ -344,6 +430,7 @@ class EnemyTank(Tank):
                 self.ai_keys[pygame.K_w] = True 
                 self.ai_keys[pygame.K_s] = True
 
+        # AI tanks always use the simple, standard drive logic
         self.update_movement(self.ai_keys, is_player=False, features=features)
         
         # 3. Turret Tracking (Aims at player)
@@ -356,4 +443,4 @@ class EnemyTank(Tank):
         if self.fire_cooldown == 0:
             if random.random() < 0.1: 
                 # Enemy firing must pass the player's world coordinates for volume calculation
-                self.fire(bullets_group, player_tank.x, player_tank.y) 
+                self.fire(bullets_group, player_tank.x, player_tank.y)

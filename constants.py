@@ -6,6 +6,16 @@ SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 800
 FPS = 60
 
+# --- GAME STATES ---
+STATE_GAMEPLAY = 0
+STATE_PAUSED = 1
+STATE_OPTIONS = 2
+
+# --- DRIVE SYSTEMS ---
+DRIVE_SYSTEM_STANDARD = 'Standard'
+DRIVE_SYSTEM_INDEPENDENT = 'Independent'
+DEFAULT_DRIVE_SYSTEM = DRIVE_SYSTEM_STANDARD
+
 # --- WORLD SETTINGS ---
 CHUNK_SIZE = 500  # Size of a single terrain chunk in world units
 FEATURE_DENSITY = 0.005 # Probability of placing an obstacle at a given coordinate ##0.0005 originally
@@ -21,6 +31,24 @@ TANK_ACCEL = 0.1
 TANK_MAX_SPEED = 3.0
 BASE_TURN_RATE = 2.0 # Degrees per frame
 MAX_HEALTH = 100
+
+# --- PLAYER CONTROLS (DEFAULT BINDINGS) ---
+# Standard Drive Keys
+KEY_FORWARD = pygame.K_w
+KEY_REVERSE = pygame.K_r
+KEY_TURN_LEFT = pygame.K_a
+KEY_TURN_RIGHT = pygame.K_s
+
+# Independent Track Drive Keys
+KEY_LEFT_FORWARD = pygame.K_UP
+KEY_LEFT_REVERSE = pygame.K_DOWN
+KEY_RIGHT_FORWARD = pygame.K_RIGHT
+KEY_RIGHT_REVERSE = pygame.K_LEFT
+
+# Pause Key
+KEY_PAUSE = pygame.K_p
+KEY_OPTIONS = pygame.K_o
+
 
 # --- TURRET & WEAPONS ---
 TURRET_LENGTH = 50
