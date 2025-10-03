@@ -174,7 +174,7 @@ class Tank(pygame.sprite.Sprite):
             turn_speed = (right_speed - left_speed) * 0.5 # Factor to control turn rate
             
             # Update angle (turning is instantaneous based on speed differential)
-            self.angle += turn_speed / TANK_MAX_SPEED * BASE_TURN_RATE * 2.5 # Adjust multiplier for desired turn rate
+            self.angle -= turn_speed / TANK_MAX_SPEED * BASE_TURN_RATE * 2.5 # Adjust multiplier for desired turn rate
             self.angle %= 360
 
             # Set self.speed for collision/velocity logic

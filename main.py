@@ -265,7 +265,7 @@ def draw_options_menu():
             # Key Button
             text = key_text
             back_color = PLAYER_COLOR
-            rect = draw_button(screen, text, small_font, x + 50, y, WHITE, back_color)
+            rect = draw_button(screen, text, small_font, x + 150, y, WHITE, back_color)
             options_button_rects[f'bind_{key_id}'] = rect
             
         y_current += (len(keys_to_bind) // 2) * 60 + 50
