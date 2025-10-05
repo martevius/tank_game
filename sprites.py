@@ -160,7 +160,7 @@ class Tank(pygame.sprite.Sprite):
         MAX_REVERSE_SPEED = TANK_MAX_SPEED / 2.0
         
         if is_player and drive_system == DRIVE_SYSTEM_INDEPENDENT:
-            # --- INDEPENDENT TRACK DRIVE LOGIC (WITH ACCEL/DECEL) ---
+            # --- INDEPENDENT TRACK DRIVE LOGIC (WITH ACCEL/DECEL AND OPPOSITE-PRESS BRAKING) ---
             
             controls = control_keys if control_keys else {
                 'lf': KEY_LEFT_FORWARD, 'lr': KEY_LEFT_REVERSE,
@@ -172,15 +172,27 @@ class Tank(pygame.sprite.Sprite):
             right_forward = keys[controls['rf']]
             right_reverse = keys[controls['rr']]
             
+            # 0. DETERMINE MAXIMUM ACCELERATION SPEED
+            max_forward_speed = TANK_MAX_SPEED
+            max_reverse_speed = MAX_REVERSE_SPEED # Already defined as TANK_MAX_SPEED / 2.0
+            
+            # Check for contradictory inputs (point turn or counter-rotation while moving)
+            is_opposites = (left_forward and right_reverse) or (left_reverse and right_forward)
+            
+            if is_opposites:
+                # Apply the requested speed reduction when tracks are instructed to run oppositely
+                max_forward_speed /= 2.0
+                #max_reverse_speed /= 2.0
+
             # 1. Update Left Track Speed with Acceleration/Deceleration
             if left_forward and not left_reverse:
-                # Accelerate forward
-                self.left_track_speed = min(self.left_track_speed + TANK_ACCEL, TANK_MAX_SPEED)
+                # Accelerate forward, limited by the potentially reduced max_forward_speed
+                self.left_track_speed = min(self.left_track_speed + TANK_ACCEL, max_forward_speed)
             elif left_reverse and not left_forward:
-                # Accelerate reverse (uses negative speed and MAX_REVERSE_SPEED)
-                self.left_track_speed = max(self.left_track_speed - TANK_ACCEL, -MAX_REVERSE_SPEED)
+                # Accelerate reverse, limited by the potentially reduced max_reverse_speed
+                self.left_track_speed = max(self.left_track_speed - TANK_ACCEL, -max_reverse_speed)
             else:
-                # Decelerate (Braking/Idle)
+                # Decelerate (Braking/Idle) - Deceleration rate is the same regardless of control input
                 if self.left_track_speed > 0:
                     self.left_track_speed = max(0.0, self.left_track_speed - TANK_ACCEL / 2)
                 elif self.left_track_speed < 0:
@@ -188,11 +200,11 @@ class Tank(pygame.sprite.Sprite):
 
             # 2. Update Right Track Speed with Acceleration/Deceleration
             if right_forward and not right_reverse:
-                # Accelerate forward
-                self.right_track_speed = min(self.right_track_speed + TANK_ACCEL, TANK_MAX_SPEED)
+                # Accelerate forward, limited by the potentially reduced max_forward_speed
+                self.right_track_speed = min(self.right_track_speed + TANK_ACCEL, max_forward_speed)
             elif right_reverse and not right_forward:
-                # Accelerate reverse
-                self.right_track_speed = max(self.right_track_speed - TANK_ACCEL, -MAX_REVERSE_SPEED)
+                # Accelerate reverse, limited by the potentially reduced max_reverse_speed
+                self.right_track_speed = max(self.right_track_speed - TANK_ACCEL, -max_reverse_speed)
             else:
                 # Decelerate (Braking/Idle)
                 if self.right_track_speed > 0:
@@ -203,20 +215,14 @@ class Tank(pygame.sprite.Sprite):
             # 3. Calculate Body Speed (Average Track Speed)
             self.speed = (self.left_track_speed + self.right_track_speed) / 2.0
             
-            # 4. Calculate Turning Rate
-            # The speed difference determines the turn rate. Normalize by max speed for smooth scaling.
+            # 4. Calculate Turning Rate (Remains the same as previous step)
             speed_difference = self.right_track_speed - self.left_track_speed
-            
-            # Use a dynamic factor for the turn rate, independent of the BASE_TURN_RATE factor, 
-            # to make turning smoother and directly proportional to the speed differential.
-            # BASE_TURN_RATE is used as a maximum scale for the turn.
-            
-            # Dynamic Turn Rate:
-            # - When differential is max (e.g., L=0, R=Max), turn rate is BASE_TURN_RATE * factor
-            # - When differential is min (L=Max, R=Max), turn rate is 0
-            
-            turn_rate = (speed_difference / (2 * TANK_MAX_SPEED)) * BASE_TURN_RATE * 5 
-            # The multiplier '5' is an adjustment for desired responsiveness
+            turn_rate = (speed_difference / (2 * TANK_MAX_SPEED)) * BASE_TURN_RATE * 5
+
+            # APPLY THE DOUBLE TURN RATE CONDITION
+            if is_opposites:
+                turn_rate *= 2.0 # Double the turning rate for aggressive point turns
+
             
             self.angle -= turn_rate
             self.angle %= 360
