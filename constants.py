@@ -61,7 +61,7 @@ BULLET_SPEED = 10.0
 BULLET_RADIUS = 5
 BULLET_DAMAGE = 25
 BULLET_LIFESPAN = 200 # Frames (5 seconds) ## 300 frames is 5 seconds
-MAX_BULLET_RANGE = 500 # Max range before bullet despawns orig 600
+MAX_BULLET_RANGE = 400 # Max range before bullet despawns orig 600
 
 # --- COLORS (R, G, B) ---
 BLACK = (0, 0, 0)
