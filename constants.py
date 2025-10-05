@@ -29,7 +29,7 @@ TANK_WIDTH = 60
 TANK_HEIGHT = 90
 TANK_ACCEL = 0.1
 TANK_MAX_SPEED = 3.0
-BASE_TURN_RATE = 2.0 # Degrees per frame
+BASE_TURN_RATE = 1.0 # Degrees per frame
 MAX_HEALTH = 100
 
 # --- PLAYER CONTROLS (DEFAULT BINDINGS) ---
@@ -40,10 +40,10 @@ KEY_TURN_LEFT = pygame.K_a
 KEY_TURN_RIGHT = pygame.K_s
 
 # Independent Track Drive Keys
-KEY_LEFT_FORWARD = pygame.K_UP
-KEY_LEFT_REVERSE = pygame.K_DOWN
-KEY_RIGHT_FORWARD = pygame.K_RIGHT
-KEY_RIGHT_REVERSE = pygame.K_LEFT
+KEY_LEFT_FORWARD = pygame.K_q
+KEY_LEFT_REVERSE = pygame.K_a
+KEY_RIGHT_FORWARD = pygame.K_w
+KEY_RIGHT_REVERSE = pygame.K_r
 
 # Pause Key
 KEY_PAUSE = pygame.K_p
@@ -76,7 +76,7 @@ WRECK_COLOR_BODY = (80, 80, 80)
 WRECK_COLOR_SMOKE = (150, 150, 150)
 
 # --- SOUND & AUDIO SETTINGS ---
-SOUND_VOLUME = 0.7 # Must be between 0.0 and 1.0
+SOUND_VOLUME = 0.2 # Must be between 0.0 and 1.0
 MAX_SOUND_DISTANCE = 1000 # Distance in world units at which sound is fully attenuated
 
 # File paths (assuming 'sounds' folder in the same directory)

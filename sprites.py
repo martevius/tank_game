@@ -87,6 +87,12 @@ class Tank(pygame.sprite.Sprite):
         self.angle = random.randint(0, 360) 
         self.turret_angle = 90
         self.speed = 0.0
+
+        # NEW: Track speeds for Independent Drive System
+        self.left_track_speed = 0.0
+        self.right_track_speed = 0.0
+
+
         self.fire_cooldown = 0 
         
     def _calculate_volume(self, player_x, player_y):
@@ -149,11 +155,13 @@ class Tank(pygame.sprite.Sprite):
     def update_movement(self, keys, is_player, features, drive_system=DRIVE_SYSTEM_STANDARD, control_keys=None):
         """Handles acceleration, turning, collision detection, and world boundary checks."""
         if not self.is_alive: return
+
+        # Max reverse speed (absolute value)
+        MAX_REVERSE_SPEED = TANK_MAX_SPEED / 2.0
         
-        elif is_player and drive_system == DRIVE_SYSTEM_INDEPENDENT:
-            # --- INDEPENDENT TRACK DRIVE LOGIC ---
+        if is_player and drive_system == DRIVE_SYSTEM_INDEPENDENT:
+            # --- INDEPENDENT TRACK DRIVE LOGIC (WITH ACCEL/DECEL) ---
             
-            # Use provided control_keys, or fall back to defaults if not provided (shouldn't happen for player)
             controls = control_keys if control_keys else {
                 'lf': KEY_LEFT_FORWARD, 'lr': KEY_LEFT_REVERSE,
                 'rf': KEY_RIGHT_FORWARD, 'rr': KEY_RIGHT_REVERSE
@@ -164,88 +172,54 @@ class Tank(pygame.sprite.Sprite):
             right_forward = keys[controls['rf']]
             right_reverse = keys[controls['rr']]
             
-            # NEW LOGIC: Max reverse speed is half of max forward speed (TANK_MAX_SPEED / 2)
-            MAX_REVERSE_SPEED = TANK_MAX_SPEED / 2.0 
-            
-            # Calculate left track speed
-            # If going forward, use TANK_MAX_SPEED; if going reverse, use MAX_REVERSE_SPEED
+            # 1. Update Left Track Speed with Acceleration/Deceleration
             if left_forward and not left_reverse:
-                left_speed = TANK_MAX_SPEED 
+                # Accelerate forward
+                self.left_track_speed = min(self.left_track_speed + TANK_ACCEL, TANK_MAX_SPEED)
             elif left_reverse and not left_forward:
-                left_speed = -MAX_REVERSE_SPEED # Note the negative sign for reverse
+                # Accelerate reverse (uses negative speed and MAX_REVERSE_SPEED)
+                self.left_track_speed = max(self.left_track_speed - TANK_ACCEL, -MAX_REVERSE_SPEED)
             else:
-                left_speed = 0.0 # Brakes/Idle
+                # Decelerate (Braking/Idle)
+                if self.left_track_speed > 0:
+                    self.left_track_speed = max(0.0, self.left_track_speed - TANK_ACCEL / 2)
+                elif self.left_track_speed < 0:
+                    self.left_track_speed = min(0.0, self.left_track_speed + TANK_ACCEL / 2)
 
-            # Calculate right track speed
-            # If going forward, use TANK_MAX_SPEED; if going reverse, use MAX_REVERSE_SPEED
+            # 2. Update Right Track Speed with Acceleration/Deceleration
             if right_forward and not right_reverse:
-                right_speed = TANK_MAX_SPEED
+                # Accelerate forward
+                self.right_track_speed = min(self.right_track_speed + TANK_ACCEL, TANK_MAX_SPEED)
             elif right_reverse and not right_forward:
-                right_speed = -MAX_REVERSE_SPEED
+                # Accelerate reverse
+                self.right_track_speed = max(self.right_track_speed - TANK_ACCEL, -MAX_REVERSE_SPEED)
             else:
-                right_speed = 0.0 # Brakes/Idle
+                # Decelerate (Braking/Idle)
+                if self.right_track_speed > 0:
+                    self.right_track_speed = max(0.0, self.right_track_speed - TANK_ACCEL / 2)
+                elif self.right_track_speed < 0:
+                    self.right_track_speed = min(0.0, self.right_track_speed + TANK_ACCEL / 2)
 
-            # The original implementation used continuous control (0 or 1), 
-            # while this new logic uses an instantaneous max speed. 
-            # For a more nuanced approach closer to the original, you'd integrate TANK_ACCEL.
-            # *Assuming the intent is to enforce the MAX limit on the resulting speed:*
-            # 
-            # --- Alternate Implementation (closer to original speed * factor structure) ---
-            # left_speed = 0.0
-            # if left_forward:
-            #     left_speed = TANK_MAX_SPEED
-            # elif left_reverse:
-            #     left_speed = -MAX_REVERSE_SPEED
-            # 
-            # right_speed = 0.0
-            # if right_forward:
-            #     right_speed = TANK_MAX_SPEED
-            # elif right_reverse:
-            #     right_speed = -MAX_REVERSE_SPEED
-            # ----------------------------------------------------------------------------
+            # 3. Calculate Body Speed (Average Track Speed)
+            self.speed = (self.left_track_speed + self.right_track_speed) / 2.0
             
-            # I will use a version that multiplies the difference by the max forward speed 
-            # and then clamps the reverse component to half the max speed. This is 
-            # simpler and aligns with the original code's one-liner style.
+            # 4. Calculate Turning Rate
+            # The speed difference determines the turn rate. Normalize by max speed for smooth scaling.
+            speed_difference = self.right_track_speed - self.left_track_speed
             
-            # Reverting to the original structure but clamping reverse
-            # Note: This approach doesn't use TANK_ACCEL for acceleration/deceleration.
+            # Use a dynamic factor for the turn rate, independent of the BASE_TURN_RATE factor, 
+            # to make turning smoother and directly proportional to the speed differential.
+            # BASE_TURN_RATE is used as a maximum scale for the turn.
             
-            # Max forward speed
-            fwd_factor = TANK_MAX_SPEED
-            # Max reverse speed (absolute value)
-            rev_factor = TANK_MAX_SPEED / 2.0 
+            # Dynamic Turn Rate:
+            # - When differential is max (e.g., L=0, R=Max), turn rate is BASE_TURN_RATE * factor
+            # - When differential is min (L=Max, R=Max), turn rate is 0
             
-            left_throttle = left_forward - left_reverse
-            right_throttle = right_forward - right_reverse
+            turn_rate = (speed_difference / (2 * TANK_MAX_SPEED)) * BASE_TURN_RATE * 5 
+            # The multiplier '5' is an adjustment for desired responsiveness
             
-            # Clamp the speed based on throttle direction and max limits
-            left_speed = (
-                max(0, left_throttle) * fwd_factor + # Forward component (max 1 * fwd)
-                min(0, left_throttle) * rev_factor  # Reverse component (min -1 * rev)
-            )
-            right_speed = (
-                max(0, right_throttle) * fwd_factor + 
-                min(0, right_throttle) * rev_factor
-            )
-            
-            
-            # Average forward speed
-            avg_speed = (left_speed + right_speed) / 2.0
-            
-            # Differential speed for turning
-            turn_speed = (right_speed - left_speed) * 0.5 # Factor to control turn rate
-            
-            # Update angle (turning is instantaneous based on speed differential)
-            self.angle -= turn_speed / TANK_MAX_SPEED * BASE_TURN_RATE * 2.5 # Adjust multiplier for desired turn rate
+            self.angle -= turn_rate
             self.angle %= 360
-
-            # Set self.speed for collision/velocity logic
-            # This is simplified: in a true physics simulation, speed is not a single value.
-            # Here, we use the average speed to determine the forward motion.
-            self.speed = avg_speed
-            
-            # Note: TANK_ACCEL logic is bypassed in this mode for simplicity
             
         elif is_player and drive_system == DRIVE_SYSTEM_STANDARD:
             # --- STANDARD DRIVE LOGIC (Original) ---
@@ -265,7 +239,7 @@ class Tank(pygame.sprite.Sprite):
             if is_forward_throttle: 
                 self.speed = min(self.speed + TANK_ACCEL, TANK_MAX_SPEED)
             elif is_reverse_throttle: 
-                self.speed = max(self.speed - TANK_ACCEL, -TANK_MAX_SPEED / 2)
+                self.speed = max(self.speed - TANK_ACCEL, -MAX_REVERSE_SPEED) # Use MAX_REVERSE_SPEED constant
             else:
                 if self.speed > 0:
                     self.speed = max(0.0, self.speed - TANK_ACCEL / 2)
@@ -294,7 +268,7 @@ class Tank(pygame.sprite.Sprite):
             if is_forward_throttle: 
                 self.speed = min(self.speed + TANK_ACCEL, TANK_MAX_SPEED)
             elif is_reverse_throttle: 
-                self.speed = max(self.speed - TANK_ACCEL, -TANK_MAX_SPEED / 2)
+                self.speed = max(self.speed - TANK_ACCEL, -MAX_REVERSE_SPEED)
             else:
                 if self.speed > 0:
                     self.speed = max(0.0, self.speed - TANK_ACCEL / 2)
@@ -327,6 +301,9 @@ class Tank(pygame.sprite.Sprite):
 
         if is_colliding:
             self.speed = 0.0
+            # Also reset track speeds on collision
+            self.left_track_speed = 0.0
+            self.right_track_speed = 0.0
         else:
             self.x, self.y = new_x, new_y
         
@@ -337,6 +314,8 @@ class Tank(pygame.sprite.Sprite):
         
         if self.x != clamped_x or self.y != clamped_y:
             self.speed = 0.0
+            self.left_track_speed = 0.0
+            self.right_track_speed = 0.0
         
         self.x, self.y = clamped_x, clamped_y
 
