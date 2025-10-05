@@ -32,6 +32,9 @@ TANK_MAX_SPEED = 3.0
 BASE_TURN_RATE = 1.0 # Degrees per frame
 MAX_HEALTH = 100
 
+# --- TURRET PARAMETERS ---
+TURRET_ROTATION_SPEED = 1.5 # Degrees per frame
+
 # --- PLAYER CONTROLS (DEFAULT BINDINGS) ---
 # Standard Drive Keys
 KEY_FORWARD = pygame.K_w

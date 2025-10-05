@@ -136,6 +136,48 @@ player_tank = initialize_game()
 # ----------------------------------------------------
 # --- UI DRAWING FUNCTIONS ---
 # ----------------------------------------------------
+
+# NEW FUNCTION: Draws a crosshair at the end of the turret line, indicating target direction
+def draw_turret_crosshair(surface, tank, camera_offset_x, camera_offset_y):
+    """Draws a crosshair at the projected point of the turret's line of sight."""
+    
+    # Tank's screen position
+    center_screen_x = int(tank.x + camera_offset_x)
+    center_screen_y = int(tank.y + camera_offset_y)
+
+    # Calculate the end point of the turret line
+    rad = math.radians(tank.turret_angle)
+    
+    # Use a longer length to make the crosshair more visible
+    crosshair_length = TURRET_LENGTH + 50 
+    
+    end_x = center_screen_x + crosshair_length * math.cos(rad)
+    end_y = center_screen_y - crosshair_length * math.sin(rad)
+    
+    # Draw the crosshair (small perpendicular lines)
+    cross_size = 8
+    
+    # Horizontal line (relative to the tank)
+    pygame.draw.line(surface, YELLOW, (end_x - cross_size, end_y), (end_x + cross_size, end_y), 2)
+    
+    # Vertical line (relative to the tank)
+    pygame.draw.line(surface, YELLOW, (end_x, end_y - cross_size), (end_x, end_y + cross_size), 2)
+
+# NEW FUNCTION: Draws a circle indicating the max bullet range
+def draw_max_range_circle(surface, tank, camera_offset_x, camera_offset_y):
+    """Draws a circle around the player indicating the bullet's maximum range."""
+    
+    # Center of the circle is the player's screen position
+    center_screen_x = int(tank.x + camera_offset_x)
+    center_screen_y = int(tank.y + camera_offset_y)
+    
+    # Radius is the max bullet range in screen pixels
+    radius = MAX_BULLET_RANGE
+    
+    # Draw a dashed or simple circle
+    pygame.draw.circle(surface, RED, (center_screen_x, center_screen_y), radius, 1)
+
+
 def draw_button(surface, text, font, center_x, center_y, color, back_color):
     """Utility function to draw a clickable button."""
     text_surface = font.render(text, True, color)
@@ -530,6 +572,11 @@ while running:
     for tank in tanks:
         if tank.is_alive:
              tank.draw(screen, camera_offset_x, camera_offset_y)
+
+    # NEW: Draw Player-specific UI only when in gameplay state
+    if player_tank.is_alive and game_state == STATE_GAMEPLAY:
+        draw_turret_crosshair(screen, player_tank, camera_offset_x, camera_offset_y)
+        draw_max_range_circle(screen, player_tank, camera_offset_x, camera_offset_y)
     
     # Draw debug/info text
     real_fps = clock.get_fps() 

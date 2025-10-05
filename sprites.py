@@ -327,7 +327,8 @@ class Tank(pygame.sprite.Sprite):
 
 
     def rotate_turret(self, target_angle):
-        if not self.is_alive: return 
+        # Allow rotation even if not alive, but the player update ensures it
+        # Only use this function for AI
         self.turret_angle = target_angle
         
     def draw(self, surface, camera_offset_x, camera_offset_y):
@@ -414,7 +415,7 @@ class PlayerTank(Tank):
         }
         
     def update(self, keys, mouse_pos, features):
-        """Handles player input for movement and decrements cooldown."""
+        """Handles player input for movement, turret aiming, and decrements cooldown."""
         
         # Pass the current drive system and control keys to the base class
         self.update_movement(
@@ -429,11 +430,43 @@ class PlayerTank(Tank):
             self.fire_cooldown -= 1
         
         if self.is_alive:
-            # Turret Aiming (uses mouse position relative to the tank's screen position)
-            dx = mouse_pos[0] - self.rect.centerx
-            dy = mouse_pos[1] - self.rect.centery
-            target_angle = math.degrees(math.atan2(-dy, dx))
-            self.rotate_turret(target_angle)
+            # --- Constant Speed Turret Rotation ---
+            
+            # 1. Determine target angle (uses mouse position relative to the tank's screen position)
+            dx_mouse = mouse_pos[0] - self.rect.centerx
+            dy_mouse = mouse_pos[1] - self.rect.centery
+            target_angle = math.degrees(math.atan2(-dy_mouse, dx_mouse))
+            
+            # 2. Calculate the difference (shortest angular distance)
+            current = self.turret_angle
+            target = target_angle
+            
+            # Normalize angles to 0-360 range
+            current = current % 360
+            target = target % 360
+            
+            # Calculate difference (signed)
+            diff = target - current
+            if diff > 180:
+                diff -= 360
+            elif diff < -180:
+                diff += 360
+            
+            # 3. Apply rotation at a constant speed
+            if abs(diff) > TURRET_ROTATION_SPEED:
+                if diff > 0:
+                    self.turret_angle += TURRET_ROTATION_SPEED
+                else:
+                    self.turret_angle -= TURRET_ROTATION_SPEED
+            else:
+                # Close enough, snap to target
+                self.turret_angle = target_angle
+            
+            self.turret_angle %= 360
+            
+            # No longer using self.rotate_turret(target_angle) to allow smooth movement.
+
+# ...
             
     def fire(self, bullets_group): 
         """Player fire method, calls base fire and uses its own coordinates for max volume."""
