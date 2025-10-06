@@ -101,6 +101,9 @@ class Tank(pygame.sprite.Sprite):
             return SOUND_VOLUME
             
         distance = math.hypot(self.x - player_x, self.y - player_y)
+
+        if distance >= MAX_SOUND_DISTANCE: # <--- Uses the new constant
+            return 0.0
         
         # Linear falloff: 1.0 at distance 0, 0.0 at MAX_SOUND_DISTANCE
         volume_ratio = 1.0 - (distance / MAX_SOUND_DISTANCE)
@@ -111,6 +114,12 @@ class Tank(pygame.sprite.Sprite):
 
     def take_damage(self, damage, player_x, player_y):
         """Calculates damage and plays explosion sound with distance volume."""
+
+        # FIX: Initialize sound_event to None at the start
+        sound_event = None 
+
+
+        
         if not self.is_alive: return 
         
         self.health -= damage
@@ -123,13 +132,25 @@ class Tank(pygame.sprite.Sprite):
                 final_volume = self._calculate_volume(player_x, player_y)
                 self.explosion_sound.set_volume(final_volume)
                 self.explosion_sound.play()
+
+                # --- NEW: Record Sound Event for Indicator ---
+                # Only record if the sound is actually audible (volume > 0)
+                if final_volume > 0.0:
+                    # [sound_type, x, y, volume]
+                    sound_event = ['explosion', self.x, self.y, final_volume] 
                 
             self.is_alive = False
             self.is_wreck = True
             self.speed = 0.0
 
+
+        return sound_event # <<< RETURN THE SOUND EVENT
+
     def fire(self, bullets_group, player_x, player_y): 
         """Spawns a bullet if the tank is alive and the cooldown is ready."""
+
+        # FIX: Initialize sound_event to None at the start
+        sound_event = None 
         if not self.is_alive or self.fire_cooldown > 0: 
             return
         
@@ -137,6 +158,11 @@ class Tank(pygame.sprite.Sprite):
         final_volume = self._calculate_volume(player_x, player_y)
         self.fire_sound.set_volume(final_volume)
         self.fire_sound.play()
+
+        # --- NEW: Record Sound Event for Indicator ---
+        if final_volume > 0.0:
+            # [sound_type, x, y, volume]
+            sound_event = ['fire', self.x, self.y, final_volume]
             
         # Calculate bullet spawn point at the tip of the turret
         rad = math.radians(self.turret_angle)
@@ -151,6 +177,8 @@ class Tank(pygame.sprite.Sprite):
         
         # Reset cooldown
         self.fire_cooldown = FIRE_COOLDOWN_FRAMES
+
+        return sound_event # <<< RETURN THE SOUND EVENT
 
     def update_movement(self, keys, is_player, features, drive_system=DRIVE_SYSTEM_STANDARD, control_keys=None):
         """Handles acceleration, turning, collision detection, and world boundary checks."""
@@ -471,7 +499,7 @@ class PlayerTank(Tank):
     def fire(self, bullets_group): 
         """Player fire method, calls base fire and uses its own coordinates for max volume."""
         # FIX: Ensure we call the super method with the required world coordinates (self.x, self.y)
-        super().fire(bullets_group, self.x, self.y)
+        return super().fire(bullets_group, self.x, self.y) # <<< ADD 'return'
 
 # ----------------------------------------------------
 # --- ENEMY TANK CLASS ---
@@ -489,7 +517,11 @@ class EnemyTank(Tank):
 
     def update(self, player_tank, features, bullets_group): 
         """Handles enemy AI movement, tracking, firing, and decrements cooldown."""
-        if not self.is_alive: return
+        # FIX: Initialize sound_event here to prevent NameError
+        sound_event = None 
+        
+        if not self.is_alive: 
+            return sound_event # Returns None
 
         # 1. Decrement Cooldown
         if self.fire_cooldown > 0:
@@ -524,4 +556,9 @@ class EnemyTank(Tank):
         if self.fire_cooldown == 0:
             if random.random() < 0.1: 
                 # Enemy firing must pass the player's world coordinates for volume calculation
-                self.fire(bullets_group, player_tank.x, player_tank.y)
+                # This call will now populate the local 'sound_event' variable.
+                sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
+
+        # NOTE: update_movement and rotate_turret do not generate sound events
+        
+        return sound_event # <<< Return the sound event

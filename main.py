@@ -29,6 +29,18 @@ fire_sound = None
 explosion_sound = None
 hit_sound = None
 
+def is_visible_on_screen(world_x, world_y, camera_offset_x, camera_offset_y):
+    """Checks if a world coordinate is currently within the screen bounds."""
+    # Convert world coordinates to screen coordinates
+    screen_x = world_x + camera_offset_x
+    screen_y = world_y + camera_offset_y
+    
+    # Check if the point is within the screen (with a small buffer)
+    buffer = 50 # Add a small buffer around the screen edge
+    
+    return (screen_x > -buffer and screen_x < SCREEN_WIDTH + buffer and
+            screen_y > -buffer and screen_y < SCREEN_HEIGHT + buffer)
+
 class DummySound:
     """Class to prevent crashes if sound files are missing."""
     def play(self): pass
@@ -60,6 +72,9 @@ player_tank = None # Will be initialized in initialize_game
 game_over = False
 game_result = ""
 restart_button_rect = None # Stores the rect of the restart button for click detection
+
+# NEW: Sound Indicator List
+active_sound_indicators = [] # Stores [IndicatorSprite, x, y] tuples
 
 # NEW GAME STATE VARIABLES
 game_state = STATE_GAMEPLAY
@@ -316,6 +331,148 @@ def draw_options_menu():
     back_rect = draw_button(screen, "Back (P/O/ESC)", medium_font, center_x, SCREEN_HEIGHT - 100, WHITE, RED)
     options_button_rects['back'] = back_rect
 
+
+# --- NEW: SOUND INDICATOR SPRITE CLASS ---
+class SoundIndicator(pygame.sprite.Sprite):
+    def __init__(self, sound_type, x, y, volume, listener_x, listener_y):
+        super().__init__()
+        
+        self.x, self.y = x, y # World position of the sound source
+        self.sound_type = sound_type
+        # Base lifetime based on volume, fading out faster
+        self.max_lifetime = int(FPS * (0.5 + 2 * volume)) 
+        self.lifetime = self.max_lifetime 
+        self.initial_volume = volume
+        
+        # Determine visual style
+        if sound_type == 'explosion':
+            self.color = RED
+            self.label = "BOOM!"
+            self.indicator_size = 15
+        elif sound_type == 'fire':
+            self.color = YELLOW
+            self.label = "FIRE"
+            self.indicator_size = 10
+        elif sound_type == 'hit':
+            self.color = WHITE
+            self.label = "HIT"
+            self.indicator_size = 8
+        else:
+            self.color = WHITE
+            self.label = "?"
+            self.indicator_size = 5
+
+    def update(self, listener_x, listener_y, camera_offset_x, camera_offset_y):
+        """Update lifetime and calculate screen position/rotation."""
+        self.lifetime -= 1
+        if self.lifetime <= 0:
+            self.kill()
+            return
+
+        # ----------------------------------------------------
+        # --- NEW: CHECK VISIBILITY AND KILL IF SOURCE IS ON-SCREEN ---
+        # ----------------------------------------------------
+        # Use the utility function to check if the sound source's world position (self.x, self.y) 
+        # is currently visible to the player.
+        """if self.sound_type != 'hit': 
+            if is_visible_on_screen(self.x, self.y, camera_offset_x, camera_offset_y):
+                self.kill() # Immediately remove the indicator if the source is seen
+                return """
+        
+        if is_visible_on_screen(self.x, self.y, camera_offset_x, camera_offset_y):
+                self.kill() # Immediately remove the indicator if the source is seen
+                return
+            
+        # Calculate vector from listener (player) to sound source
+        dx = self.x - listener_x
+        dy = self.y - listener_y
+        distance = math.hypot(dx, dy)
+        
+        # Calculate angle of the sound source relative to the screen/player center
+        # atan2(y, x) for angle from positive x-axis, then convert to degrees
+        self.angle = math.degrees(math.atan2(-dy, dx)) # -dy because Pygame y-axis is inverted
+
+        # Determine how far to place the indicator on the screen (clamped to edge)
+        # Use a distance greater than MAX_BULLET_RANGE to ensure it appears outside the range circle
+        
+        # Max distance on screen before clamping to the edge for the HUD element
+        hud_radius = min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.45 
+        
+        # Place the indicator further out if the source is far, but clamp at the HUD radius
+        distance_factor = min(1.0, distance / MAX_SOUND_DISTANCE) 
+        
+        # Use the HUD radius to place the indicator on the screen
+        indicator_dist_from_center = hud_radius * (0.8 + 0.2 * distance_factor) # Place it slightly inside the edge
+        
+        # Calculate screen position based on angle and distance from screen center
+        # Player is at (SCREEN_WIDTH/2, SCREEN_HEIGHT/2) in a non-scrolling HUD context
+        center_x, center_y = SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2
+        
+        self.screen_x = center_x + indicator_dist_from_center * math.cos(math.radians(self.angle))
+        self.screen_y = center_y - indicator_dist_from_center * math.sin(math.radians(self.angle))
+        
+        # Fading: opacity based on remaining lifetime
+        self.alpha = int(255 * (self.lifetime / self.max_lifetime))
+        
+    def draw(self, surface):
+        """Draws the indicator (triangle pointing inwards) and text."""
+        
+        # Don't draw if not enough opacity or has expired
+        if self.lifetime <= 0 or self.alpha < 10:
+            return
+            
+        current_color = (self.color[0], self.color[1], self.color[2], self.alpha)
+        
+        # 1. Draw the Directional Triangle (Arrow)
+        arrow_size = self.indicator_size
+        
+        # Calculate the base of the triangle (perpendicular to the direction vector)
+        rad = math.radians(self.angle)
+        
+        # The center of the indicator is self.screen_x, self.screen_y
+        
+        # The base of the arrow faces the player
+        base_angle_rad = rad + math.pi / 2 # Perpendicular
+        
+        p1_x = self.screen_x + arrow_size * math.cos(rad)
+        p1_y = self.screen_y - arrow_size * math.sin(rad)
+
+        p2_x = self.screen_x + arrow_size * math.cos(base_angle_rad)
+        p2_y = self.screen_y - arrow_size * math.sin(base_angle_rad)
+        
+        p3_x = self.screen_x - arrow_size * math.cos(base_angle_rad)
+        p3_y = self.screen_y + arrow_size * math.sin(base_angle_rad)
+        
+        # Create a surface with per-pixel alpha for the colored triangle
+        arrow_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        pygame.draw.polygon(arrow_surface, current_color, [(p1_x, p1_y), (p2_x, p2_y), (p3_x, p3_y)])
+        surface.blit(arrow_surface, (0, 0)) # Blit the whole surface
+        
+        # 2. Draw the Text Label (Fading)
+        # Temporarily use the small font initialized earlier
+        try:
+            # Render with a slight distance away from the triangle
+            text_x = self.screen_x + (arrow_size + 5) * math.cos(rad)
+            text_y = self.screen_y - (arrow_size + 5) * math.sin(rad)
+            
+            # Text should be rendered with opacity (not directly supported by pygame.font)
+            # We'll stick to full opacity text and let the triangle fade, or use an overlay trick
+            
+            # Simple text rendering (no fade on text to simplify)
+            text_surface = small_font.render(self.label, True, self.color)
+            text_rect = text_surface.get_rect(center=(int(text_x), int(text_y)))
+            surface.blit(text_surface, text_rect)
+            
+        except NameError:
+             # Fallback if small_font isn't available (shouldn't happen)
+             pass
+
+
+# Create a new sprite group for indicators
+indicator_group = pygame.sprite.Group()
+
+
+
 # ----------------------------------------------------
 # --- GAME LOOP ---
 # ----------------------------------------------------
@@ -422,6 +579,14 @@ while running:
         
         # Player Update
         player_tank.update(keys, mouse_pos, terrain_features)
+
+        # --- NEW: Handle player's own fire sound ---
+##        player_fire_event = player_tank.fire(bullets)
+##        if player_fire_event:
+##            # Unpack the sound event: [sound_type, x, y, volume]
+##            s_type, s_x, s_y, s_vol = player_fire_event
+##            new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)
+##            indicator_group.add(new_indicator)
         
         enemies_left = 0
         for tank in tanks:
@@ -498,18 +663,62 @@ while running:
                 for tank_hit in hit_tanks:
                     if tank_hit.rect.collidepoint(bullet.rect.center):
                         # TANK DAMAGE: Explosion sound volume is now calculated inside take_damage()
-                        tank_hit.take_damage(BULLET_DAMAGE, listener_x, listener_y) 
-                        bullet.kill() 
+                        # --- NEW: Capture Take Damage/Explosion Sound Event ---
+                        sound_event = tank_hit.take_damage(BULLET_DAMAGE, listener_x, listener_y)
+                        if sound_event:
+                            s_type, s_x, s_y, s_vol = sound_event
+                            new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)
+                            indicator_group.add(new_indicator)
+                            
+                        bullet.kill()
+
+                        # HIT SOUND: Volume must be calculated here...
+
+                        # --- FIX: Recalculate final_volume for the HIT sound ---
+                        # Note: The Tank class has a private method for this, we must replicate its logic here:
                         
-                        # HIT SOUND: Volume must be calculated here since the sound object belongs to main.py
-                        distance = math.hypot(bullet.x - listener_x, bullet.y - listener_y)
-                        volume_ratio = 1.0 - (distance / MAX_SOUND_DISTANCE)
-                        # Apply a base factor (0.7) and clamp the volume
-                        final_volume = max(0.0, min(1.0, volume_ratio)) * SOUND_VOLUME * 0.7 
-                        
+                        # Calculate distance between player (listener) and the hit tank (sound source)
+                        dist = math.hypot(tank_hit.x - listener_x, tank_hit.y - listener_y)
+
+                        # Calculate final volume (0.0 to 1.0)
+                        # Assumes MAX_SOUND_DISTANCE is defined in constants.py (or uses 1000 as a default range)
+                        MAX_SOUND_DISTANCE = 1500 # Assume a value if not in constants (check constants.py)
+
+                        # Simple linear volume falloff
+                        if dist >= MAX_SOUND_DISTANCE:
+                            final_volume = 0.0
+                        else:
+                            final_volume = max(0.0, 1.0 - (dist / MAX_SOUND_DISTANCE))
+
+                        # Play hit sound with distance volume
                         hit_sound.set_volume(final_volume)
-                        hit_sound.play() 
+                        hit_sound.play()
+                        
+                        # ... (lines 393-401 of original main.py - remains the same)
+                        # --- NEW: Add a separate indicator for HIT sound ---
+                        # Hit sound is non-positional, so its indicator is always centered/fading
+                        if final_volume > 0.0:
+                            # Use player's position as the sound location for a non-directional indicator
+                            hit_indicator = SoundIndicator('hit', listener_x, listener_y, final_volume, listener_x, listener_y) 
+                            indicator_group.add(hit_indicator)
+
                         break
+
+                # --- UPDATE SOUND INDICATORS ---
+                # Pass the player's position and camera offset for world-to-screen conversion
+                for indicator in indicator_group:
+                    indicator.update(listener_x, listener_y, camera_offset_x, camera_offset_y)
+
+                    """    
+                    # HIT SOUND: Volume must be calculated here since the sound object belongs to main.py
+                    distance = math.hypot(bullet.x - listener_x, bullet.y - listener_y)
+                    volume_ratio = 1.0 - (distance / MAX_SOUND_DISTANCE)
+                    # Apply a base factor (0.7) and clamp the volume
+                    final_volume = max(0.0, min(1.0, volume_ratio)) * SOUND_VOLUME * 0.7 
+                        
+                    hit_sound.set_volume(final_volume)
+                    hit_sound.play() 
+                    break  """
                         
             # --- GAME STATE CHECK ---
             if player_tank.is_wreck and not game_over:
@@ -577,6 +786,11 @@ while running:
     if player_tank.is_alive and game_state == STATE_GAMEPLAY:
         draw_turret_crosshair(screen, player_tank, camera_offset_x, camera_offset_y)
         draw_max_range_circle(screen, player_tank, camera_offset_x, camera_offset_y)
+
+    # NEW: Draw sound indicators (MUST be last to be on top of everything)
+    if game_state == STATE_GAMEPLAY:
+        for indicator in indicator_group:
+            indicator.draw(screen)
     
     # Draw debug/info text
     real_fps = clock.get_fps() 
