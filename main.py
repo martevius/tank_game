@@ -112,6 +112,7 @@ def initialize_game():
     # Initialize Other Tanks (Pass sound objects)
     NUM_FRIENDLIES = 0
     NUM_ENEMIES = 1
+    NUM_DUMMIES = 1
 
     for _ in range(NUM_FRIENDLIES):
         x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
@@ -122,6 +123,12 @@ def initialize_game():
         x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
         enemy = EnemyTank(x, y, fire_sound, explosion_sound) 
         tanks.add(enemy)
+
+    for _ in range(NUM_DUMMIES):
+        x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
+        enemy = DummyEnemyTank(x, y, fire_sound, explosion_sound) 
+        tanks.add(enemy)
+
         
     return new_player_tank
 
@@ -145,6 +152,9 @@ def reset_game():
     game_over = False
     game_result = ""
     game_state = STATE_GAMEPLAY
+
+    #reset indicator group?
+    indicator_group = pygame.sprite.Group()
 
 # Initial game setup
 player_tank = initialize_game()
@@ -188,7 +198,7 @@ def draw_max_range_circle(surface, tank, camera_offset_x, camera_offset_y):
     center_screen_y = int(tank.y + camera_offset_y)
     
     # Radius is the max bullet range in screen pixels
-    radius = MAX_BULLET_RANGE
+    radius = MAX_BULLET_RANGE + 30
     
     # Draw a dashed or simple circle
     pygame.draw.circle(surface, RED, (center_screen_x, center_screen_y), radius, 1)
@@ -353,6 +363,7 @@ class SoundIndicator(pygame.sprite.Sprite):
         self.lifetime = self.max_lifetime 
         self.initial_volume = volume
         self.alpha = 20
+        self.angle = 0
         
         # Determine visual style
         if sound_type == 'explosion':
@@ -638,6 +649,7 @@ while running:
                     if min_dist_sq <= MAX_BULLET_RANGE**2 and tank.fire_cooldown == 0:
                         # Fire requires the bullets group and listener position (player's coordinates)
                         sound_event = tank.fire(bullets, player_tank.x, player_tank.y)
+                        print("tank fired")
                         if sound_event:
                             s_type, s_x, s_y, s_vol = sound_event
                             new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)

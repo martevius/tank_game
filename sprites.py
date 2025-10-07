@@ -551,7 +551,78 @@ class EnemyTank(Tank):
         dy = player_tank.y - self.y
         target_angle = math.degrees(math.atan2(-dy, dx))
         self.rotate_turret(target_angle)
+
+        """
+        # 4. Firing 
+        if self.fire_cooldown == 0:
+            if random.random() < 0.1: 
+                # Enemy firing must pass the player's world coordinates for volume calculation
+                # This call will now populate the local 'sound_event' variable.
+                sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
+                """
+
+        # NOTE: update_movement and rotate_turret do not generate sound events
         
+        return sound_event # <<< Return the sound event
+
+
+
+# ----------------------------------------------------
+# --- DUMMY ENEMY TANK CLASS ---
+# ----------------------------------------------------
+class DummyEnemyTank(Tank):
+    def __init__(self, x, y, fire_sound, explosion_sound):
+        super().__init__(x, y, 'Enemy', fire_sound, explosion_sound)
+        self.move_timer = 0
+        self.ai_keys = {
+            pygame.K_w: False, 
+            pygame.K_r: False, 
+            pygame.K_a: False, 
+            pygame.K_s: False
+        }
+
+    def update(self, player_tank, features, bullets_group): 
+        """Handles enemy AI movement, tracking, firing, and decrements cooldown."""
+        # FIX: Initialize sound_event here to prevent NameError
+        sound_event = None 
+        
+        if not self.is_alive: 
+            return sound_event # Returns None
+
+        # 1. Decrement Cooldown
+        if self.fire_cooldown > 0:
+            self.fire_cooldown -= 1
+
+        """    
+
+        # 2. AI Movement (Simple random movement cycle)
+        self.move_timer -= 1
+        if self.move_timer <= 0:
+            self.move_timer = random.randint(30, 120) 
+            self.ai_keys = {pygame.K_w: False, pygame.K_r: False, pygame.K_a: False, pygame.K_s: False}
+            action = random.choice(['forward', 'turn_left', 'turn_right', 'stop'])
+            
+            if action == 'forward':
+                self.ai_keys[pygame.K_w] = True
+            elif action == 'turn_left':
+                self.ai_keys[pygame.K_w] = True 
+                self.ai_keys[pygame.K_a] = True
+            elif action == 'turn_right':
+                self.ai_keys[pygame.K_w] = True 
+                self.ai_keys[pygame.K_s] = True
+
+                """
+
+        # AI tanks always use the simple, standard drive logic
+        self.update_movement(self.ai_keys, is_player=False, features=features)
+        
+        # 3. Turret Tracking (Aims at player)
+        dx = player_tank.x - self.x
+        dy = player_tank.y - self.y
+        target_angle = math.degrees(math.atan2(-dy, dx))
+        self.rotate_turret(target_angle)
+
+        """
         # 4. Firing 
         if self.fire_cooldown == 0:
             if random.random() < 0.1: 
@@ -559,6 +630,9 @@ class EnemyTank(Tank):
                 # This call will now populate the local 'sound_event' variable.
                 sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
 
+                """
+
         # NOTE: update_movement and rotate_turret do not generate sound events
         
         return sound_event # <<< Return the sound event
+
