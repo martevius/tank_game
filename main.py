@@ -36,7 +36,7 @@ def is_visible_on_screen(world_x, world_y, camera_offset_x, camera_offset_y):
     screen_y = world_y + camera_offset_y
     
     # Check if the point is within the screen (with a small buffer)
-    buffer = 50 # Add a small buffer around the screen edge
+    buffer = 0 # Add a small buffer around the screen edge
     
     return (screen_x > -buffer and screen_x < SCREEN_WIDTH + buffer and
             screen_y > -buffer and screen_y < SCREEN_HEIGHT + buffer)
@@ -72,6 +72,7 @@ player_tank = None # Will be initialized in initialize_game
 game_over = False
 game_result = ""
 restart_button_rect = None # Stores the rect of the restart button for click detection
+INDICATOR_MIN_LIFETIME = FPS * 1.5 # 1.5 seconds minimum visibility
 
 # NEW: Sound Indicator List
 active_sound_indicators = [] # Stores [IndicatorSprite, x, y] tuples
@@ -339,10 +340,19 @@ class SoundIndicator(pygame.sprite.Sprite):
         
         self.x, self.y = x, y # World position of the sound source
         self.sound_type = sound_type
-        # Base lifetime based on volume, fading out faster
-        self.max_lifetime = int(FPS * (0.5 + 2 * volume)) 
+
+        # FIX: Ensure a minimum lifespan if the sound is audible (volume > 0)
+        # The base lifetime is still longer for louder sounds, but capped at a minimum.
+        INDICATOR_MIN_LIFETIME = 480 # Using 90 frames (1.5 seconds at 60 FPS)
+
+        # Calculate base lifetime: a minimum plus a volume-dependent bonus
+        base_lifetime = int(FPS * (0.5 + 2 * volume))
+        
+        # Set max_lifetime to at least the minimum, guaranteeing visibility
+        self.max_lifetime = max(INDICATOR_MIN_LIFETIME, base_lifetime) 
         self.lifetime = self.max_lifetime 
         self.initial_volume = volume
+        self.alpha = 20
         
         # Determine visual style
         if sound_type == 'explosion':
@@ -391,6 +401,8 @@ class SoundIndicator(pygame.sprite.Sprite):
         # Calculate angle of the sound source relative to the screen/player center
         # atan2(y, x) for angle from positive x-axis, then convert to degrees
         self.angle = math.degrees(math.atan2(-dy, dx)) # -dy because Pygame y-axis is inverted
+        #self.angle = math.degrees(math.atan2(dy, -dx)) # -dy because Pygame y-axis is inverted
+        #print(self.angle)
 
         # Determine how far to place the indicator on the screen (clamped to edge)
         # Use a distance greater than MAX_BULLET_RANGE to ensure it appears outside the range circle
@@ -414,11 +426,13 @@ class SoundIndicator(pygame.sprite.Sprite):
         # Fading: opacity based on remaining lifetime
         self.alpha = int(255 * (self.lifetime / self.max_lifetime))
         
+        
     def draw(self, surface):
         """Draws the indicator (triangle pointing inwards) and text."""
         
         # Don't draw if not enough opacity or has expired
         if self.lifetime <= 0 or self.alpha < 10:
+            #print("not drawn")
             return
             
         current_color = (self.color[0], self.color[1], self.color[2], self.alpha)
@@ -623,7 +637,11 @@ while running:
                     # Fire if target is within range and cooldown is 0
                     if min_dist_sq <= MAX_BULLET_RANGE**2 and tank.fire_cooldown == 0:
                         # Fire requires the bullets group and listener position (player's coordinates)
-                        tank.fire(bullets, player_tank.x, player_tank.y)
+                        sound_event = tank.fire(bullets, player_tank.x, player_tank.y)
+                        if sound_event:
+                            s_type, s_x, s_y, s_vol = sound_event
+                            new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)
+                            indicator_group.add(new_indicator)
                         
                     # Slow movement: Advance if the enemy is far, stop if they are close
                     if min_dist_sq > (MAX_BULLET_RANGE * 0.75)**2:
@@ -798,22 +816,25 @@ while running:
     enemies_left = sum(1 for t in tanks if t.allegiance == 'Enemy' and t.is_alive)
     drive_mode_text = f"Drive: {player_tank.drive_system}"
     mode_text = f"HP: {player_tank.health} | Enemies Left: {enemies_left}"
-    cooldown_text = f"Ready in: {max(0, player_tank.fire_cooldown) / FPS:.2f}s"
+    
     angle_speed_text = f"Angle: {player_tank.angle:.2f} | Speed: {player_tank.speed:.2f}"
     fps_text = f"FPS: {real_fps:.2f}"
+    cooldown_text = f"Ready in: {max(0, player_tank.fire_cooldown) / FPS:.2f}s"
     
     if 'debug_font' in locals() and debug_font:
         text_surface_drive = debug_font.render(drive_mode_text, True, BLACK)
         text_surface_mode = debug_font.render(mode_text, True, BLACK)
-        text_surface_cooldown = debug_font.render(cooldown_text, True, RED if player_tank.fire_cooldown > 0 else PLAYER_COLOR)
+        
         text_surface_angle_speed = debug_font.render(angle_speed_text, True, BLACK)
         text_surface_fps = debug_font.render(fps_text, True, BLACK)
+        text_surface_cooldown = debug_font.render(cooldown_text, True, RED if player_tank.fire_cooldown > 0 else PLAYER_COLOR)
     
         screen.blit(text_surface_drive, (10, 10))
         screen.blit(text_surface_mode, (10, 40))
-        screen.blit(text_surface_cooldown, (10, 70))
+        
         screen.blit(text_surface_angle_speed, (10, 100))
         screen.blit(text_surface_fps, (10, 130))
+        screen.blit(text_surface_cooldown, (10, 70))
     
     # --- GAME OVER SCREEN & RESTART BUTTON ---
     if game_over:
