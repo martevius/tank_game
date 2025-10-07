@@ -110,8 +110,8 @@ def initialize_game():
     tanks.add(new_player_tank)
 
     # Initialize Other Tanks (Pass sound objects)
-    NUM_FRIENDLIES = 2
-    NUM_ENEMIES = 3
+    NUM_FRIENDLIES = 0
+    NUM_ENEMIES = 1
 
     for _ in range(NUM_FRIENDLIES):
         x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
