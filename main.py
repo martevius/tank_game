@@ -112,7 +112,7 @@ def initialize_game():
     # Initialize Other Tanks (Pass sound objects)
     NUM_FRIENDLIES = 0
     NUM_ENEMIES = 1
-    NUM_DUMMIES = 1
+    NUM_DUMMIES = 0
 
     for _ in range(NUM_FRIENDLIES):
         x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
@@ -353,13 +353,14 @@ class SoundIndicator(pygame.sprite.Sprite):
 
         # FIX: Ensure a minimum lifespan if the sound is audible (volume > 0)
         # The base lifetime is still longer for louder sounds, but capped at a minimum.
-        INDICATOR_MIN_LIFETIME = 60 # Using 90 frames (1.5 seconds at 60 FPS)
+        INDICATOR_MIN_LIFETIME = 40 # Using 90 frames (1.5 seconds at 60 FPS)
 
         # Calculate base lifetime: a minimum plus a volume-dependent bonus
         base_lifetime = int(FPS * (0.5 + 2 * volume))
         
         # Set max_lifetime to at least the minimum, guaranteeing visibility
-        self.max_lifetime = max(INDICATOR_MIN_LIFETIME, base_lifetime) 
+        #self.max_lifetime = max(INDICATOR_MIN_LIFETIME, base_lifetime)
+        self.max_lifetime = INDICATOR_MIN_LIFETIME
         self.lifetime = self.max_lifetime 
         self.initial_volume = volume
         self.alpha = 20
