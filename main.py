@@ -353,7 +353,7 @@ class SoundIndicator(pygame.sprite.Sprite):
 
         # FIX: Ensure a minimum lifespan if the sound is audible (volume > 0)
         # The base lifetime is still longer for louder sounds, but capped at a minimum.
-        INDICATOR_MIN_LIFETIME = 480 # Using 90 frames (1.5 seconds at 60 FPS)
+        INDICATOR_MIN_LIFETIME = 60 # Using 90 frames (1.5 seconds at 60 FPS)
 
         # Calculate base lifetime: a minimum plus a volume-dependent bonus
         base_lifetime = int(FPS * (0.5 + 2 * volume))
@@ -364,6 +364,10 @@ class SoundIndicator(pygame.sprite.Sprite):
         self.initial_volume = volume
         self.alpha = 20
         self.angle = 0
+
+        #initiate
+        self.screen_x = 0
+        self.screen_y = 0
         
         # Determine visual style
         if sound_type == 'explosion':
@@ -617,9 +621,14 @@ while running:
         for tank in tanks:
             if isinstance(tank, EnemyTank):
                 # Enemy update requires the bullets group to fire
-                tank.update(player_tank, terrain_features, bullets) 
+                sound_event = tank.update(player_tank, terrain_features, bullets) 
                 if tank.is_alive:
                     enemies_left += 1
+
+                if sound_event:
+                    s_type, s_x, s_y, s_vol = sound_event
+                    new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)
+                    indicator_group.add(new_indicator)
             elif tank != player_tank and tank.is_alive:
                 # --- FRIENDLY TANK AI --- (Logic remains the same, uses default keys)
                 
@@ -649,7 +658,7 @@ while running:
                     if min_dist_sq <= MAX_BULLET_RANGE**2 and tank.fire_cooldown == 0:
                         # Fire requires the bullets group and listener position (player's coordinates)
                         sound_event = tank.fire(bullets, player_tank.x, player_tank.y)
-                        print("tank fired")
+                        #print("tank fired")
                         if sound_event:
                             s_type, s_x, s_y, s_vol = sound_event
                             new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)

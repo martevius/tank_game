@@ -552,14 +552,14 @@ class EnemyTank(Tank):
         target_angle = math.degrees(math.atan2(-dy, dx))
         self.rotate_turret(target_angle)
 
-        """
+        
         # 4. Firing 
         if self.fire_cooldown == 0:
             if random.random() < 0.1: 
                 # Enemy firing must pass the player's world coordinates for volume calculation
                 # This call will now populate the local 'sound_event' variable.
                 sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
-                """
+                
 
         # NOTE: update_movement and rotate_turret do not generate sound events
         
