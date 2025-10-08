@@ -382,6 +382,10 @@ class SoundIndicator(pygame.sprite.Sprite):
             self.color = WHITE
             self.label = "HIT"
             self.indicator_size = 8
+        elif sound_type == 'player hit':
+            self.color = PLAYER_COLOR
+            self.label = "PLAYER HIT"
+            self.indicator_size = 8
         else:
             self.color = WHITE
             self.label = "?"
@@ -404,9 +408,9 @@ class SoundIndicator(pygame.sprite.Sprite):
                 self.kill() # Immediately remove the indicator if the source is seen
                 return """
         
-        if is_visible_on_screen(self.x, self.y, camera_offset_x, camera_offset_y):
-                self.kill() # Immediately remove the indicator if the source is seen
-                return
+##        if is_visible_on_screen(self.x, self.y, camera_offset_x, camera_offset_y):
+##                self.kill() # Immediately remove the indicator if the source is seen
+##                return
             
         # Calculate vector from listener (player) to sound source
         dx = self.x - listener_x
@@ -704,10 +708,11 @@ while running:
                         # TANK DAMAGE: Explosion sound volume is now calculated inside take_damage()
                         # --- NEW: Capture Take Damage/Explosion Sound Event ---
                         sound_event = tank_hit.take_damage(BULLET_DAMAGE, listener_x, listener_y)
-                        if sound_event:
-                            s_type, s_x, s_y, s_vol = sound_event
-                            new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)
-                            indicator_group.add(new_indicator)
+##                        if sound_event:
+##                            print("hit")
+##                            s_type, s_x, s_y, s_vol = sound_event
+##                            new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)
+##                            indicator_group.add(new_indicator)
                             
                         bullet.kill()
 
@@ -738,8 +743,13 @@ while running:
                         # Hit sound is non-positional, so its indicator is always centered/fading
                         if final_volume > 0.0:
                             # Use player's position as the sound location for a non-directional indicator
-                            hit_indicator = SoundIndicator('hit', listener_x, listener_y, final_volume, listener_x, listener_y) 
-                            indicator_group.add(hit_indicator)
+                            #print("hit")
+                            if tank_hit != player_tank:
+                                hit_indicator = SoundIndicator('hit', tank_hit.x, tank_hit.y, final_volume, listener_x, listener_y) 
+                                indicator_group.add(hit_indicator)
+                            elif tank_hit == player_tank:
+                                hit_indicator = SoundIndicator('player hit', tank_hit.x, tank_hit.y, final_volume, listener_x, listener_y)
+                                indicator_group.add(hit_indicator)
 
                         break
 
