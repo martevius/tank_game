@@ -153,8 +153,8 @@ def reset_game():
     game_result = ""
     game_state = STATE_GAMEPLAY
 
-    #reset indicator group?
-    indicator_group = pygame.sprite.Group()
+    # RESET INDICATOR GROUP
+    indicator_group.empty() # Call empty() to clear all IndicatorSprites
 
 # Initial game setup
 player_tank = initialize_game()
