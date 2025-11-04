@@ -515,6 +515,42 @@ class EnemyTank(Tank):
             pygame.K_s: False
         }
 
+    def _can_fire_at_player(self, player_tank):
+        """
+        Checks if the turret angle is close enough to the target angle (player).
+        """
+        if not self.is_alive or self.fire_cooldown > 0:
+            return False
+
+        # 1. Determine target angle
+        dx = player_tank.x - self.x
+        dy = player_tank.y - self.y
+        target_angle = math.degrees(math.atan2(-dy, dx))
+        
+        # 2. Calculate the difference (shortest angular distance)
+        current = self.turret_angle % 360
+        target = target_angle % 360
+        
+        diff = target - current
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+
+        # Define an acceptable firing tolerance (e.g., 5 degrees)
+        FIRING_TOLERANCE = 5.0 
+        
+        # 3. Check if the turret is aimed well
+        is_aimed = abs(diff) < FIRING_TOLERANCE
+        
+        # 4. Optional: Check distance (only fire if player is within a certain range)
+        distance = math.hypot(dx, dy)
+        MAX_FIRING_DISTANCE = 800 # You can adjust this value
+        is_in_range = distance < MAX_FIRING_DISTANCE
+        
+        # Combine conditions: Cooldown is ready, turret is aimed, and player is in range
+        return is_aimed and is_in_range
+
     def update(self, player_tank, features, bullets_group): 
         """Handles enemy AI movement, tracking, firing, and decrements cooldown."""
         # FIX: Initialize sound_event here to prevent NameError
@@ -554,11 +590,10 @@ class EnemyTank(Tank):
 
         
         # 4. Firing 
-        if self.fire_cooldown == 0:
-            if random.random() < 0.1: 
-                # Enemy firing must pass the player's world coordinates for volume calculation
-                # This call will now populate the local 'sound_event' variable.
-                sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
+        # Check explicit firing condition (cooldown and aiming)
+        if self._can_fire_at_player(player_tank): 
+            # Enemy firing must pass the player's world coordinates for volume calculation
+            sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
                 
 
         # NOTE: update_movement and rotate_turret do not generate sound events
@@ -622,7 +657,7 @@ class DummyEnemyTank(Tank):
         target_angle = math.degrees(math.atan2(-dy, dx))
         self.rotate_turret(target_angle)
 
-        """
+        
         # 4. Firing 
         if self.fire_cooldown == 0:
             if random.random() < 0.1: 
@@ -630,7 +665,7 @@ class DummyEnemyTank(Tank):
                 # This call will now populate the local 'sound_event' variable.
                 sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
 
-                """
+                
 
         # NOTE: update_movement and rotate_turret do not generate sound events
         

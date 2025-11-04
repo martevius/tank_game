@@ -111,7 +111,7 @@ def initialize_game():
 
     # Initialize Other Tanks (Pass sound objects)
     NUM_FRIENDLIES = 0
-    NUM_ENEMIES = 1
+    NUM_ENEMIES = 2
     NUM_DUMMIES = 0
 
     for _ in range(NUM_FRIENDLIES):
@@ -384,7 +384,7 @@ class SoundIndicator(pygame.sprite.Sprite):
             self.label = "HIT"
             self.indicator_size = 8
         elif sound_type == 'player hit':
-            self.color = PLAYER_COLOR
+            self.color = RED
             self.label = "PLAYER HIT"
             self.indicator_size = 8
         else:
@@ -622,6 +622,7 @@ while running:
 ##            new_indicator = SoundIndicator(s_type, s_x, s_y, s_vol, listener_x, listener_y)
 ##            indicator_group.add(new_indicator)
         
+        
         enemies_left = 0
         for tank in tanks:
             if isinstance(tank, EnemyTank):
@@ -641,10 +642,14 @@ while running:
                 nearest_enemy = None
                 min_dist_sq = float('inf')
                 
+                
+                    
+                
                 for enemy in tanks:
                     # Only consider active enemies
                     if enemy.allegiance == 'Enemy' and enemy.is_alive:
                         dist_sq = (tank.x - enemy.x)**2 + (tank.y - enemy.y)**2
+                        #print(dist_sq)
                         if dist_sq < min_dist_sq:
                             min_dist_sq = dist_sq
                             nearest_enemy = enemy
@@ -662,6 +667,8 @@ while running:
                     # Fire if target is within range and cooldown is 0
                     if min_dist_sq <= MAX_BULLET_RANGE**2 and tank.fire_cooldown == 0:
                         # Fire requires the bullets group and listener position (player's coordinates)
+                        
+                        print("fired")
                         sound_event = tank.fire(bullets, player_tank.x, player_tank.y)
                         #print("tank fired")
                         if sound_event:

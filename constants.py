@@ -80,7 +80,7 @@ WRECK_COLOR_SMOKE = (150, 150, 150)
 
 # --- SOUND & AUDIO SETTINGS ---
 SOUND_VOLUME = 0.2 # Must be between 0.0 and 1.0
-MAX_SOUND_DISTANCE = 1500 # Distance in world units at which sound is fully attenuated
+MAX_SOUND_DISTANCE = 2500 # Distance in world units at which sound is fully attenuated
 
 # File paths (assuming 'sounds' folder in the same directory)
 SOUND_DIR = 'sounds'
