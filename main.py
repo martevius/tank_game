@@ -67,7 +67,9 @@ except pygame.error as e:
 terrain_features = []
 generated_chunks = set()
 bullets = pygame.sprite.Group() 
-tanks = pygame.sprite.Group() 
+tanks = pygame.sprite.Group()
+friendly_tanks = pygame.sprite.Group()
+all_friendly_tanks = pygame.sprite.Group()
 player_tank = None # Will be initialized in initialize_game
 game_over = False
 game_result = ""
@@ -108,16 +110,19 @@ def initialize_game():
     start_x, start_y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=1)
     new_player_tank = PlayerTank(start_x, start_y, fire_sound, explosion_sound)
     tanks.add(new_player_tank)
+    all_friendly_tanks.add(new_player_tank)
 
     # Initialize Other Tanks (Pass sound objects)
-    NUM_FRIENDLIES = 0
-    NUM_ENEMIES = 2
+    NUM_FRIENDLIES = 2
+    NUM_ENEMIES = 3
     NUM_DUMMIES = 0
 
     for _ in range(NUM_FRIENDLIES):
         x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
         friendly = Tank(x, y, 'Friendly', fire_sound, explosion_sound) 
         tanks.add(friendly)
+        friendly_tanks.add(friendly)
+        all_friendly_tanks.add(friendly)
 
     for _ in range(NUM_ENEMIES):
         x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
@@ -624,10 +629,13 @@ while running:
         
         
         enemies_left = 0
+        # Assuming 'player_tank' is the PlayerTank object and 'friendly_tanks' is a list of other friendly AI
+        
+        
         for tank in tanks:
             if isinstance(tank, EnemyTank):
                 # Enemy update requires the bullets group to fire
-                sound_event = tank.update(player_tank, terrain_features, bullets) 
+                sound_event = tank.update(all_friendly_tanks, terrain_features, bullets) 
                 if tank.is_alive:
                     enemies_left += 1
 
@@ -668,7 +676,7 @@ while running:
                     if min_dist_sq <= MAX_BULLET_RANGE**2 and tank.fire_cooldown == 0:
                         # Fire requires the bullets group and listener position (player's coordinates)
                         
-                        print("fired")
+                        #print("fired")
                         sound_event = tank.fire(bullets, player_tank.x, player_tank.y)
                         #print("tank fired")
                         if sound_event:

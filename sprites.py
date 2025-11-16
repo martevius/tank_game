@@ -515,55 +515,73 @@ class EnemyTank(Tank):
             pygame.K_s: False
         }
 
-    def _can_fire_at_player(self, player_tank):
-        """
-        Checks if the turret angle is close enough to the target angle (player).
-        """
-        if not self.is_alive or self.fire_cooldown > 0:
+    # Add the target finder method here
+    def _find_target(self, possible_targets):
+        # ... (implementation as shown in section 1) ...
+        closest_target = None
+        min_distance_sq = float('inf')
+        
+        for target in possible_targets:
+            if target.is_alive:
+                dx = target.x - self.x
+                dy = target.y - self.y
+                distance_sq = dx**2 + dy**2
+                
+                if distance_sq < min_distance_sq:
+                    min_distance_sq = distance_sq
+                    closest_target = target
+                    
+        return closest_target
+
+    # Rename and modify the can_fire method
+    def _can_fire_at_target(self, target):
+        # ... (implementation as shown in section 2) ...
+        if not self.is_alive or self.fire_cooldown > 0 or not target:
             return False
 
-        # 1. Determine target angle
-        dx = player_tank.x - self.x
-        dy = player_tank.y - self.y
+        dx = target.x - self.x
+        dy = target.y - self.y
         target_angle = math.degrees(math.atan2(-dy, dx))
         
-        # 2. Calculate the difference (shortest angular distance)
         current = self.turret_angle % 360
-        target = target_angle % 360
+        target_norm = target_angle % 360
         
-        diff = target - current
-        if diff > 180:
-            diff -= 360
-        elif diff < -180:
-            diff += 360
+        diff = target_norm - current
+        if diff > 180: diff -= 360
+        elif diff < -180: diff += 360
 
-        # Define an acceptable firing tolerance (e.g., 5 degrees)
         FIRING_TOLERANCE = 5.0 
-        
-        # 3. Check if the turret is aimed well
         is_aimed = abs(diff) < FIRING_TOLERANCE
         
-        # 4. Optional: Check distance (only fire if player is within a certain range)
         distance = math.hypot(dx, dy)
-        MAX_FIRING_DISTANCE = 800 # You can adjust this value
+        MAX_FIRING_DISTANCE = 800 
         is_in_range = distance < MAX_FIRING_DISTANCE
         
-        # Combine conditions: Cooldown is ready, turret is aimed, and player is in range
         return is_aimed and is_in_range
-
-    def update(self, player_tank, features, bullets_group): 
+        
+    # Update signature to accept ALL targets
+    def update(self, all_friendly_units, features, bullets_group): 
         """Handles enemy AI movement, tracking, firing, and decrements cooldown."""
-        # FIX: Initialize sound_event here to prevent NameError
         sound_event = None 
         
         if not self.is_alive: 
-            return sound_event # Returns None
+            return sound_event 
 
-        # 1. Decrement Cooldown
+        # 1. Select Target (Closest one)
+        # 'all_friendly_units' must be a list containing the player and all friendly AI tanks
+        current_target = self._find_target(all_friendly_units)
+        
+        if not current_target:
+            # No targets alive, stop processing
+            if self.fire_cooldown > 0: self.fire_cooldown -= 1
+            self.speed = 0.0
+            return sound_event 
+        
+        # 2. Decrement Cooldown
         if self.fire_cooldown > 0:
             self.fire_cooldown -= 1
 
-        # 2. AI Movement (Simple random movement cycle)
+        # 3. AI Movement (Simple random movement cycle - keeping original for now)
         self.move_timer -= 1
         if self.move_timer <= 0:
             self.move_timer = random.randint(30, 120) 
@@ -579,26 +597,21 @@ class EnemyTank(Tank):
                 self.ai_keys[pygame.K_w] = True 
                 self.ai_keys[pygame.K_s] = True
 
-        # AI tanks always use the simple, standard drive logic
         self.update_movement(self.ai_keys, is_player=False, features=features)
         
-        # 3. Turret Tracking (Aims at player)
-        dx = player_tank.x - self.x
-        dy = player_tank.y - self.y
+        # 4. Turret Tracking (Aims at the SELECTED Target)
+        dx = current_target.x - self.x
+        dy = current_target.y - self.y
         target_angle = math.degrees(math.atan2(-dy, dx))
         self.rotate_turret(target_angle)
 
         
-        # 4. Firing 
-        # Check explicit firing condition (cooldown and aiming)
-        if self._can_fire_at_player(player_tank): 
-            # Enemy firing must pass the player's world coordinates for volume calculation
-            sound_event = self.fire(bullets_group, player_tank.x, player_tank.y)
+        # 5. Firing 
+        if self._can_fire_at_target(current_target): 
+            # Firing uses the target's coordinates for volume calculation
+            sound_event = self.fire(bullets_group, current_target.x, current_target.y)
                 
-
-        # NOTE: update_movement and rotate_turret do not generate sound events
-        
-        return sound_event # <<< Return the sound event
+        return sound_event
 
 
 
