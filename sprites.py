@@ -505,6 +505,7 @@ class PlayerTank(Tank):
 # --- ENEMY TANK CLASS ---
 # ----------------------------------------------------
 class EnemyTank(Tank):
+    
     def __init__(self, x, y, fire_sound, explosion_sound):
         super().__init__(x, y, 'Enemy', fire_sound, explosion_sound)
         self.move_timer = 0
@@ -514,6 +515,7 @@ class EnemyTank(Tank):
             pygame.K_a: False, 
             pygame.K_s: False
         }
+    
 
     # Add the target finder method here
     def _find_target(self, possible_targets):
@@ -560,7 +562,7 @@ class EnemyTank(Tank):
         return is_aimed and is_in_range
         
     # Update signature to accept ALL targets
-    def update(self, all_friendly_units, features, bullets_group): 
+    def update(self, all_friendly_units, player_x, player_y, features, bullets_group): 
         """Handles enemy AI movement, tracking, firing, and decrements cooldown."""
         sound_event = None 
         
@@ -609,10 +611,126 @@ class EnemyTank(Tank):
         # 5. Firing 
         if self._can_fire_at_target(current_target): 
             # Firing uses the target's coordinates for volume calculation
-            sound_event = self.fire(bullets_group, current_target.x, current_target.y)
+            sound_event = self.fire(bullets_group, player_x, player_y)
                 
         return sound_event
 
+
+# ----------------------------------------------------
+# --- FRIENDLY AI TANK CLASS ---
+# ----------------------------------------------------
+class FriendlyAITank(Tank):
+    
+    def __init__(self, x, y, fire_sound, explosion_sound):
+        # Allegiance is 'Friendly'
+        super().__init__(x, y, 'Friendly', fire_sound, explosion_sound)
+        self.move_timer = 0
+        self.ai_keys = {
+            pygame.K_w: False, 
+            pygame.K_r: False, 
+            pygame.K_a: False, 
+            pygame.K_s: False
+        }
+
+    def _find_target(self, possible_targets):
+        """Finds the closest alive enemy target."""
+        closest_target = None
+        min_distance_sq = float('inf')
+        
+        for target in possible_targets:
+            if target.is_alive:
+                dx = target.x - self.x
+                dy = target.y - self.y
+                distance_sq = dx**2 + dy**2
+                
+                if distance_sq < min_distance_sq:
+                    min_distance_sq = distance_sq
+                    closest_target = target
+                    
+        return closest_target
+
+    def _can_fire_at_target(self, target):
+        """Checks if the tank is aimed and in range of the target."""
+        if not self.is_alive or self.fire_cooldown > 0 or not target:
+            return False
+
+        dx = target.x - self.x
+        dy = target.y - self.y
+        target_angle = math.degrees(math.atan2(-dy, dx))
+        
+        current = self.turret_angle % 360
+        target_norm = target_angle % 360
+        
+        diff = target_norm - current
+        if diff > 180: diff -= 360
+        elif diff < -180: diff += 360
+
+        FIRING_TOLERANCE = 5.0 
+        is_aimed = abs(diff) < FIRING_TOLERANCE
+        
+        distance = math.hypot(dx, dy)
+        MAX_FIRING_DISTANCE = 800 
+        is_in_range = distance < MAX_FIRING_DISTANCE
+        
+        return is_aimed and is_in_range
+        
+    def update(self, all_enemy_units, player_x, player_y, features, bullets_group): 
+        """Handles friendly AI movement, tracking, firing, and decrements cooldown."""
+        # The player's coordinates (player_x, player_y) are passed for sound volume calculation
+        sound_event = None 
+        
+        if not self.is_alive: 
+            return sound_event 
+
+        # 1. Select Target (Closest one) - Must be from all_enemy_units
+        current_target = self._find_target(all_enemy_units)
+        
+        if not current_target:
+            # No targets alive, stop processing
+            if self.fire_cooldown > 0: self.fire_cooldown -= 1
+            self.speed = 0.0
+            # Ensure AI stops moving when no target is present
+            self.ai_keys = {pygame.K_w: False, pygame.K_r: False, pygame.K_a: False, pygame.K_s: False}
+            self.update_movement(self.ai_keys, is_player=False, features=features)
+            return sound_event 
+        
+        # 2. Decrement Cooldown
+        if self.fire_cooldown > 0:
+            self.fire_cooldown -= 1
+
+        # 3. AI Movement (Simple random movement cycle)
+        self.move_timer -= 1
+        if self.move_timer <= 0:
+            self.move_timer = random.randint(30, 120) 
+            self.ai_keys = {pygame.K_w: False, pygame.K_r: False, pygame.K_a: False, pygame.K_s: False}
+            # Keep moving forward/turning to seek the target area
+            action = random.choice(['forward', 'turn_left', 'turn_right'])
+            
+            if action == 'forward':
+                self.ai_keys[pygame.K_w] = True
+            elif action == 'turn_left':
+                self.ai_keys[pygame.K_w] = True 
+                self.ai_keys[pygame.K_a] = True
+            elif action == 'turn_right':
+                self.ai_keys[pygame.K_w] = True 
+                self.ai_keys[pygame.K_s] = True
+
+        # AI tanks always use the simple, standard drive logic
+        self.update_movement(self.ai_keys, is_player=False, features=features)
+        
+        # 4. Turret Tracking (Aims at the SELECTED Enemy Target)
+        dx = current_target.x - self.x
+        dy = current_target.y - self.y
+        target_angle = math.degrees(math.atan2(-dy, dx))
+        self.rotate_turret(target_angle)
+
+        
+        # 5. Firing 
+        if self._can_fire_at_target(current_target): 
+            # Firing uses the player's coordinates for volume calculation
+            sound_event = self.fire(bullets_group, player_x, player_y)
+                
+        return sound_event
 
 
 # ----------------------------------------------------

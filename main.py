@@ -74,7 +74,8 @@ player_tank = None # Will be initialized in initialize_game
 game_over = False
 game_result = ""
 restart_button_rect = None # Stores the rect of the restart button for click detection
-INDICATOR_MIN_LIFETIME = FPS * 1.5 # 1.5 seconds minimum visibility
+INDICATOR_MIN_LIFETIME = 40
+#INDICATOR_BASE_LIFETIME_FRAMES = int(FPS * 0.75) # Base lifetime of the sound indicator is 3 seconds
 
 # NEW: Sound Indicator List
 active_sound_indicators = [] # Stores [IndicatorSprite, x, y] tuples
@@ -119,7 +120,7 @@ def initialize_game():
 
     for _ in range(NUM_FRIENDLIES):
         x, y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=4)
-        friendly = Tank(x, y, 'Friendly', fire_sound, explosion_sound) 
+        friendly = FriendlyAITank(x, y, fire_sound, explosion_sound) 
         tanks.add(friendly)
         friendly_tanks.add(friendly)
         all_friendly_tanks.add(friendly)
@@ -356,18 +357,22 @@ class SoundIndicator(pygame.sprite.Sprite):
         self.x, self.y = x, y # World position of the sound source
         self.sound_type = sound_type
 
-        # FIX: Ensure a minimum lifespan if the sound is audible (volume > 0)
-        # The base lifetime is still longer for louder sounds, but capped at a minimum.
-        INDICATOR_MIN_LIFETIME = 40 # Using 90 frames (1.5 seconds at 60 FPS)
-
-        # Calculate base lifetime: a minimum plus a volume-dependent bonus
-        base_lifetime = int(FPS * (0.5 + 2 * volume))
+        # FIX: Implement the requested 3-second base lifetime + a volume-dependent bonus.
+        # This replaces the old, buggy logic that incorrectly set self.max_lifetime to a fixed 40 frames.
+        
+        # Volume bonus: 0 seconds for silent, up to 1 second for max volume.
+        volume_bonus_seconds = volume * 1.0 
+        volume_bonus_frames = int(FPS * volume_bonus_seconds)
+        
+        # The new max lifetime is the base (3s) + the volume bonus (0-1s).
+        #self.max_lifetime = INDICATOR_BASE_LIFETIME_FRAMES + volume_bonus_frames
         
         # Set max_lifetime to at least the minimum, guaranteeing visibility
-        #self.max_lifetime = max(INDICATOR_MIN_LIFETIME, base_lifetime)
-        self.max_lifetime = INDICATOR_MIN_LIFETIME
+        #self.max_lifetime = max(INDICATOR_MIN_LIFETIME, base_lifetime)...
+        self.max_lifetime = INDICATOR_MIN_LIFETIME # <-- BUGGY LINE REMOVED
+        
         self.lifetime = self.max_lifetime 
-        self.initial_volume = volume
+        self.initial_volume = volume 
         self.alpha = 20
         self.angle = 0
 
@@ -635,7 +640,7 @@ while running:
         for tank in tanks:
             if isinstance(tank, EnemyTank):
                 # Enemy update requires the bullets group to fire
-                sound_event = tank.update(all_friendly_tanks, terrain_features, bullets) 
+                sound_event = tank.update(all_friendly_tanks, player_tank.x, player_tank.y, terrain_features, bullets) 
                 if tank.is_alive:
                     enemies_left += 1
 
