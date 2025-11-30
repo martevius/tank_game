@@ -2,6 +2,34 @@ import pygame
 import random
 from constants import *
 
+# --- UTILITY DRAWING FUNCTIONS ---
+
+def draw_button(surface, text, font, center_x, center_y, text_color, button_color, padding_x=30, padding_y=15, border_radius=10):
+    """
+    Renders a button with text centered at the specified coordinates.
+    Returns the final pygame.Rect object of the button's background.
+    """
+    
+    # Render the text
+    text_surface = font.render(text, True, text_color)
+    text_rect = text_surface.get_rect(center=(center_x, center_y))
+    
+    # Create the button background rectangle (with padding)
+    button_rect = pygame.Rect(
+        text_rect.left - padding_x, 
+        text_rect.top - padding_y, 
+        text_rect.width + padding_x * 2, 
+        text_rect.height + padding_y * 2
+    )
+    
+    # Draw button background
+    pygame.draw.rect(surface, button_color, button_rect, border_radius=border_radius)
+    
+    # Draw text on top
+    surface.blit(text_surface, text_rect.topleft)
+    
+    return button_rect
+
 def generate_chunk(chunk_x, chunk_y):
     """
     Generates terrain features (obstacles) for a specific chunk area.

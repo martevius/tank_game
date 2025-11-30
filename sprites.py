@@ -93,7 +93,35 @@ class Tank(pygame.sprite.Sprite):
         self.right_track_speed = 0.0
 
 
-        self.fire_cooldown = 0 
+        self.fire_cooldown = 0
+
+    def reset(self, x, y):
+        """
+        Resets the tank's state and moves it to a new location.
+        Used for starting a new level or restarting the game.
+        """
+        # 1. Reset Position
+        self.x = x
+        self.y = y
+        self.rect.center = (x, y) # Update the sprite's pygame rect
+        
+        # 2. Reset Core State
+        self.health = MAX_HEALTH
+        self.is_wreck = False
+        self.is_alive = True # Assuming you have a separate is_alive flag
+        self.fire_cooldown = 0
+        
+        # 3. Reset Movement State (to prevent tank from starting with momentum)
+        self.speed = 0.0
+        self.acceleration = 0.0
+        # self.angle remains the same, or you could reset it: self.angle = 0 
+        
+        # 4. Re-render the body image (in case it was set to a wreck texture)
+        # Assuming you have a method to redraw the image or it handles wreck state automatically.
+        # If your tank changes visuals when wrecked, ensure you redraw the live version here.
+        
+        # NOTE: You may need to add a line here to reset the tank's image 
+        # from a wreck image back to the normal tank image if that logic exists.
         
     def _calculate_volume(self, player_x, player_y):
         """Calculates volume based on distance to the player (the listener)."""

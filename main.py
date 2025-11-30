@@ -77,6 +77,13 @@ restart_button_rect = None # Stores the rect of the restart button for click det
 INDICATOR_MIN_LIFETIME = 40
 #INDICATOR_BASE_LIFETIME_FRAMES = int(FPS * 0.75) # Base lifetime of the sound indicator is 3 seconds
 
+# NEW: Level Management
+current_level = 1 # Start at Level 1
+MAX_LEVEL = 5 # As per your request
+
+# NEW GAME STATE VARIABLES
+game_state = STATE_GAMEPLAY
+
 # NEW: Sound Indicator List
 active_sound_indicators = [] # Stores [IndicatorSprite, x, y] tuples
 
@@ -88,18 +95,51 @@ is_rebinding = False
 rebinding_key_name = ""
 
 
+def get_enemy_count_for_level(level):
+    """Returns the number of enemies based on the current level."""
+    if level == 1:
+        return 3
+    elif level == 2:
+        return 6
+    elif level == 3:
+        return 10
+    elif level == 4:
+        return 15
+    elif level == 5:
+        return 20
+    # For levels beyond the max, use the max level count
+    return get_enemy_count_for_level(MAX_LEVEL)
+
+def next_level():
+    """Advances to the next level."""
+    global current_level, game_over
+    
+    current_level += 1
+    
+    if current_level > MAX_LEVEL:
+        # Game finished all levels
+        game_over = True
+        game_result = f"ULTIMATE VICTORY! You conquered all {MAX_LEVEL} levels!"
+        return
+
+    print(f"Starting Level {current_level}...")
+    # NOTE: You must update reset_game to accept and use the start_level parameter.
+    reset_game(start_level=current_level)
+
 # ----------------------------------------------------
 # --- GAME SETUP FUNCTIONS ---
 # ----------------------------------------------------
-def initialize_game():
+def initialize_game(keep_player=False):
     """Initializes all game objects and world state."""
-    global terrain_features, generated_chunks, bullets, tanks, player_tank
+    global terrain_features, generated_chunks, bullets, tanks, player_tank, current_level, friendly_tanks, all_friendly_tanks
     
     # Reset groups and lists
     terrain_features = []
     generated_chunks = set()
     bullets.empty()
     tanks.empty()
+    friendly_tanks.empty()
+    all_friendly_tanks.empty()
     
     # Generate initial terrain (Center chunks)
     for y in range(-1, 2):
@@ -107,15 +147,23 @@ def initialize_game():
             terrain_features.extend(generate_chunk(x, y))
             generated_chunks.add((x, y))
 
-    # Initialize Player Tank (Pass sound objects)
-    start_x, start_y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=1)
-    new_player_tank = PlayerTank(start_x, start_y, fire_sound, explosion_sound)
-    tanks.add(new_player_tank)
-    all_friendly_tanks.add(new_player_tank)
+    # Initialize Player Tank (If not keeping the old one)
+    if not keep_player or player_tank is None:
+        start_x, start_y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=1)
+        new_player_tank = PlayerTank(start_x, start_y, fire_sound, explosion_sound)
+        player_tank = new_player_tank
+    else:
+        # Re-spawn the existing player tank for the new level
+        start_x, start_y = find_safe_spawn_position(terrain_features, min_dist=150, spawn_area_size=1)
+        player_tank.reset(start_x, start_y) # Assuming a reset method exists in PlayerTank
 
-    # Initialize Other Tanks (Pass sound objects)
+    
+    tanks.add(player_tank)
+    all_friendly_tanks.add(player_tank)
+
+    # Initialize Other Tanks (Friendlies remain constant)
     NUM_FRIENDLIES = 2
-    NUM_ENEMIES = 3
+    NUM_ENEMIES = get_enemy_count_for_level(current_level)
     NUM_DUMMIES = 0
 
     for _ in range(NUM_FRIENDLIES):
@@ -136,18 +184,21 @@ def initialize_game():
         tanks.add(enemy)
 
         
-    return new_player_tank
+    return player_tank
 
-def reset_game():
+def reset_game(start_level = 1):
     """Resets the game state and reinitializes game objects."""
-    global game_over, game_result, player_tank, game_state
+    global game_over, game_result, player_tank, game_state, current_level
+
+    # Reset level to start_level (1 for a true restart)
+    current_level = start_level
     
     # Preserve player tank's control settings across resets
     old_drive_system = player_tank.drive_system if player_tank else DEFAULT_DRIVE_SYSTEM
     old_control_keys = player_tank.control_keys if player_tank else {}
 
     # Reinitialize all game objects
-    player_tank = initialize_game()
+    player_tank = initialize_game(keep_player=True)
     
     # Restore player tank's control settings
     player_tank.drive_system = old_drive_system
@@ -161,6 +212,21 @@ def reset_game():
 
     # RESET INDICATOR GROUP
     indicator_group.empty() # Call empty() to clear all IndicatorSprites
+
+def next_level():
+    """Advances to the next level."""
+    global current_level, game_over
+    
+    current_level += 1
+    
+    if current_level > MAX_LEVEL:
+        # Game finished all levels
+        game_over = True
+        game_result = f"ULTIMATE VICTORY! You conquered all {MAX_LEVEL} levels!"
+        return
+
+    print(f"Starting Level {current_level}...")
+    reset_game(start_level=current_level)
 
 # Initial game setup
 player_tank = initialize_game()
@@ -572,10 +638,18 @@ while running:
                 # Player fire() is called here
                 player_tank.fire(bullets)
                 
-            elif game_over and restart_button_rect and restart_button_rect.collidepoint(mouse_pos):
-                print("Restarting game...")
-                reset_game()
-                continue
+            elif game_over and restart_button_rect: # Check if the action button is present
+                # restart_button_rect is now a tuple: (rect, action)
+                rect, action = restart_button_rect
+                
+                if rect.collidepoint(mouse_pos):
+                    if action == 'reset':
+                        print("Restarting game...")
+                        reset_game()
+                    elif action == 'next_level':
+                        print(f"Advancing to Level {current_level + 1}...")
+                        next_level()
+                    continue
                 
             elif game_state == STATE_PAUSED:
                 if 'resume' in options_button_rects and options_button_rects['resume'].collidepoint(mouse_pos):
@@ -797,9 +871,16 @@ while running:
             
             enemies_left = sum(1 for t in tanks if t.allegiance == 'Enemy' and t.is_alive)
             
+            # MODIFIED: Check for level completion instead of Game Over
             if enemies_left == 0 and sum(1 for tank in tanks if tank.allegiance == 'Enemy') > 0 and not game_over:
-                game_over = True
-                game_result = "VICTORY! All enemy tanks destroyed."
+                # All enemies defeated! Advance to the next level.
+                if current_level < MAX_LEVEL:
+                    game_result = f"LEVEL {current_level} COMPLETE!"
+                    game_over = True # Set flag to display the temporary 'Level Complete' screen
+                else:
+                    # Final Level Complete - Triggers Ultimate Victory
+                    game_over = True
+                    game_result = f"VICTORY! All enemies destroyed."
 
 
         # --- DYNAMIC CHUNK GENERATION (Only when player is alive) ---
@@ -888,57 +969,65 @@ while running:
         screen.blit(text_surface_fps, (10, 130))
         screen.blit(text_surface_cooldown, (10, 70))
     
-    # --- GAME OVER SCREEN & RESTART BUTTON ---
+    # --- GAME OVER SCREEN & RESTART/NEXT LEVEL BUTTON ---
     if game_over:
-        # Drawing game over menu (remains the same)
+        # 1. Draw Overlay and Result Text
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180)) 
         screen.blit(overlay, (0, 0))
         
-        # 1. Draw Result Text
-        color = YELLOW if game_result.startswith("VICTORY") else RED
-        
-        if 'large_font' in locals() and large_font:
-            result_text = large_font.render(game_result, True, color)
-            result_rect = result_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
-            screen.blit(result_text, result_rect)
+        result_surface = large_font.render(game_result, True, WHITE)
+        result_rect = result_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 30))
+        screen.blit(result_surface, result_rect)
 
-        # 2. Draw Restart Button
-        restart_text = "Restart Game"
-        restart_surface = medium_font.render(restart_text, True, WHITE)
+        # 2. Determine Action and Draw Button (The fix is entirely in this section)
         
-        # Create the button rectangle (with padding)
-        padding_x, padding_y = 30, 15
-        restart_rect = restart_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80))
+        # Check if the player won the level (not ultimate victory)
+        # Note: current_level and MAX_LEVEL must be defined global variables
+        is_level_complete = "COMPLETE" in game_result and current_level < MAX_LEVEL
         
-        button_rect = pygame.Rect(
-            restart_rect.left - padding_x, 
-            restart_rect.top - padding_y, 
-            restart_rect.width + padding_x * 2, 
-            restart_rect.height + padding_y * 2
+        if is_level_complete:
+            # Level Complete, show 'Next Level'
+            button_text = f"Proceed to Level {current_level + 1}"
+            button_color = HP_BAR_GREEN
+            action = 'next_level'
+        elif "VICTORY" in game_result:
+            # Ultimate Victory
+            button_text = "Play Again (Level 1)"
+            button_color = PLAYER_COLOR
+            action = 'reset'
+        else:
+            # Defeat screen
+            button_text = "Restart Game (Level 1)"
+            button_color = RED
+            action = 'reset'
+            
+        # Draw the button using the draw_button utility from utilities.py
+        # This function returns the rect, solving the original NameError.
+        button_rect = draw_button(
+            screen, button_text, medium_font, 
+            SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80, 
+            WHITE, button_color
         )
         
-        # Store the rect for click detection
-        restart_button_rect = button_rect 
-        
-        # Draw button background
-        pygame.draw.rect(screen, PLAYER_COLOR, button_rect, border_radius=10)
-        
-        # Draw text on top
-        screen.blit(restart_surface, restart_rect.topleft)
+        # Store the rect and the intended action for click detection
+        # restart_button_rect is a tuple: (rect, action)
+        restart_button_rect = (button_rect, action) 
 
+    # --- Continue with other states ---
     elif game_state == STATE_PAUSED:
         draw_pause_menu()
+        # Ensure restart_button_rect is cleared when not in game_over state
         restart_button_rect = None
         
     elif game_state == STATE_OPTIONS:
         draw_options_menu()
+        # Ensure restart_button_rect is cleared when not in game_over state
         restart_button_rect = None
         
     else:
         # Reset button rect when game is active to prevent accidental clicks
         restart_button_rect = None
-        # options_button_rects is managed within draw_pause/options_menu for each call
 
     # Update the entire screen
     pygame.display.flip()
