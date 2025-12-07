@@ -984,8 +984,8 @@ while running:
         
         screen.blit(text_surface_angle_speed, (10, 100))
         screen.blit(text_surface_fps, (10, 130))
-        screen.blit(text_surface_cooldown, (10, 70))
-        screen.blit(text_level, (10, 155))
+        screen.blit(text_surface_cooldown, (240, 155))
+        screen.blit(text_level, (10, 70))
     
     # --- GAME OVER SCREEN & RESTART/NEXT LEVEL BUTTON ---
     if game_over:
