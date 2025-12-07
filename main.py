@@ -110,6 +110,21 @@ def get_enemy_count_for_level(level):
     # For levels beyond the max, use the max level count
     return get_enemy_count_for_level(MAX_LEVEL)
 
+def get_friendly_count_for_level(level):
+    """Returns the number of enemies based on the current level."""
+    if level == 1:
+        return 3
+    elif level == 2:
+        return 6
+    elif level == 3:
+        return 10
+    elif level == 4:
+        return 15
+    elif level == 5:
+        return 20
+    # For levels beyond the max, use the max level count
+    return get_friendly_count_for_level(MAX_LEVEL)
+
 def next_level():
     """Advances to the next level."""
     global current_level, game_over
@@ -162,7 +177,7 @@ def initialize_game(keep_player=False):
     all_friendly_tanks.add(player_tank)
 
     # Initialize Other Tanks (Friendlies remain constant)
-    NUM_FRIENDLIES = 2
+    NUM_FRIENDLIES = get_friendly_count_for_level(current_level)
     NUM_ENEMIES = get_enemy_count_for_level(current_level)
     NUM_DUMMIES = 0
 
@@ -953,6 +968,7 @@ while running:
     angle_speed_text = f"Angle: {player_tank.angle:.2f} | Speed: {player_tank.speed:.2f}"
     fps_text = f"FPS: {real_fps:.2f}"
     cooldown_text = f"Ready in: {max(0, player_tank.fire_cooldown) / FPS:.2f}s"
+    level_text = f"Current level: {current_level}"
     
     if 'debug_font' in locals() and debug_font:
         text_surface_drive = debug_font.render(drive_mode_text, True, BLACK)
@@ -961,6 +977,7 @@ while running:
         text_surface_angle_speed = debug_font.render(angle_speed_text, True, BLACK)
         text_surface_fps = debug_font.render(fps_text, True, BLACK)
         text_surface_cooldown = debug_font.render(cooldown_text, True, RED if player_tank.fire_cooldown > 0 else PLAYER_COLOR)
+        text_level = debug_font.render(level_text, True, BLACK)
     
         screen.blit(text_surface_drive, (10, 10))
         screen.blit(text_surface_mode, (10, 40))
@@ -968,6 +985,7 @@ while running:
         screen.blit(text_surface_angle_speed, (10, 100))
         screen.blit(text_surface_fps, (10, 130))
         screen.blit(text_surface_cooldown, (10, 70))
+        screen.blit(text_level, (10, 155))
     
     # --- GAME OVER SCREEN & RESTART/NEXT LEVEL BUTTON ---
     if game_over:
