@@ -976,7 +976,7 @@ while running:
         
         text_surface_angle_speed = debug_font.render(angle_speed_text, True, BLACK)
         text_surface_fps = debug_font.render(fps_text, True, BLACK)
-        text_surface_cooldown = debug_font.render(cooldown_text, True, RED if player_tank.fire_cooldown > 0 else PLAYER_COLOR)
+        text_surface_cooldown = medium_font.render(cooldown_text, True, RED if player_tank.fire_cooldown > 0 else PLAYER_COLOR)
         text_level = debug_font.render(level_text, True, BLACK)
     
         screen.blit(text_surface_drive, (10, 10))
