@@ -633,7 +633,21 @@ class EnemyTank(Tank):
         dx = current_target.x - self.x
         dy = current_target.y - self.y
         target_angle = math.degrees(math.atan2(-dy, dx))
-        self.rotate_turret(target_angle)
+        #self.rotate_turret(target_angle)
+        # 2. Calculate the difference between current and target angle
+        # Use modulo to ensure we find the shortest path (e.g., don't turn 350 degrees to the right when 10 to the left works)
+        angle_diff = (target_angle - self.turret_angle + 180) % 360 - 180
+
+        # 3. Rotate gradually instead of snapping
+        if abs(angle_diff) <= TURRET_ROTATION_SPEED:
+            # If the difference is small, just snap to the target to avoid "jittering"
+            self.turret_angle = target_angle
+        else:
+            # Otherwise, move only by the maximum speed allowed
+            if angle_diff > 0:
+                self.turret_angle += TURRET_ROTATION_SPEED
+            else:
+                self.turret_angle -= TURRET_ROTATION_SPEED
 
         
         # 5. Firing 
